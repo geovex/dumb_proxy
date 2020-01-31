@@ -50,6 +50,7 @@ async fn socks5_parser(mut sock: TcpStream, resolver: TokioAsyncResolver) -> Res
             IpAddr::from(addr)
         },
         3 => {
+            use std::net::ToSocketAddrs;
             let len = sock.read_u8().await? as usize;
             let mut domain = vec![0u8; len];
             sock.read_exact(domain.as_mut_slice()).await?;
@@ -71,6 +72,15 @@ async fn socks5_parser(mut sock: TcpStream, resolver: TokioAsyncResolver) -> Res
                     return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found"))
                 }
             }
+            // let domain: String = domain.chars().filter(|x| *x == ':').collect(); //possible : injection
+            // let domain = format!("{}:10", domain); 
+            // match domain.to_socket_addrs() {
+            //     Ok(mut addrs) => {addrs.next().unwrap().ip()},
+            //     Err(err) => {
+            //         dbg!(err);
+            //         return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found")
+            //     )}
+            // }
         },
         4 => {//ipv6
             let mut addr = [0u8; 16];

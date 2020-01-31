@@ -14,6 +14,7 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
         }
     };
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    sock.set_nodelay(true)?;
     //check version
     check_version(&mut sock).await?;
     //check auth version

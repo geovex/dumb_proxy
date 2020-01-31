@@ -1,7 +1,8 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Result};
+use tokio::io;
 use tokio::net::TcpStream;
 use tokio;
-
+use std::net::{ToSocketAddrs, SocketAddr};
 
 pub async fn tcp_tranciever(mut src: TcpStream, mut dst: TcpStream) -> Result<()> {
     println!("tranciever");
@@ -23,5 +24,20 @@ pub async fn tcp_tranciever(mut src: TcpStream, mut dst: TcpStream) -> Result<()
                 return Ok(());
             }
         }
+    }
+}
+
+pub async fn resolve_sockaddr<S: Into<String>>(addr_port: S) -> Result<SocketAddr> {
+    let string_addr_port = addr_port.into();
+    let addrs = tokio::task::spawn_blocking(move || {
+        dbg!(&string_addr_port);
+        string_addr_port.to_socket_addrs()
+    }).await?;
+    match addrs {
+        Ok(mut addr_list) => {Ok(addr_list.next().unwrap())},
+        Err(err) => {
+            dbg!(err);
+            return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found")
+        )}
     }
 }

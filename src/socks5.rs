@@ -2,11 +2,10 @@ use tokio::io::Result;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use super::util;
-use trust_dns_resolver::{TokioAsyncResolver, config::*};
 
 use std::net::{SocketAddr, IpAddr};
 
-async fn socks5_parser(mut sock: TcpStream, resolver: TokioAsyncResolver) -> Result<()> {
+async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     async fn check_version(sock: &mut TcpStream) -> Result<()> {
         if 5 != sock.read_u8().await? {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid version"));
@@ -56,31 +55,9 @@ async fn socks5_parser(mut sock: TcpStream, resolver: TokioAsyncResolver) -> Res
             sock.read_exact(domain.as_mut_slice()).await?;
             let domain = std::str::from_utf8(domain.as_slice()).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "domain parse error"))?;
             dbg!(&domain);
-            match resolver.lookup_ip(domain).await {
-                Ok(responce) => {
-                    responce.iter().next().ok_or(io::Error::new(io::ErrorKind::NotFound, "resolve error"))?
-                },
-                Err(err) => {
-                    dbg!(err);
-                    let reply = [
-                        0x5u8, //VER
-                        0x04, //host unreachable
-                        0, //RSV reserved
-                        0x1, 0x0, 0x0, 0x0, 0x0, //zeroed ipv4
-                        0x0, 0x0]; //seroed port
-                    sock.write_all(&reply).await.ok();
-                    return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found"))
-                }
-            }
-            // let domain: String = domain.chars().filter(|x| *x == ':').collect(); //possible : injection
-            // let domain = format!("{}:10", domain); 
-            // match domain.to_socket_addrs() {
-            //     Ok(mut addrs) => {addrs.next().unwrap().ip()},
-            //     Err(err) => {
-            //         dbg!(err);
-            //         return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found")
-            //     )}
-            // }
+            let domain: String = domain.chars().filter(|x| *x != ':').collect(); //possible : injection
+            let domain = format!("{}:10", domain); 
+            util::resolve_sockaddr(domain).await?.ip()
         },
         4 => {//ipv6
             let mut addr = [0u8; 16];
@@ -119,10 +96,8 @@ async fn socks5_parser(mut sock: TcpStream, resolver: TokioAsyncResolver) -> Res
 
 pub async fn socks5(src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
-    let resolver = TokioAsyncResolver::tokio_from_system_conf().await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
-        let resolver_clone = resolver.clone();
-        tokio::spawn(async move {socks5_parser(sock, resolver_clone).await.ok()});
+        tokio::spawn(async move {socks5_parser(sock).await.ok()});
     }
 }

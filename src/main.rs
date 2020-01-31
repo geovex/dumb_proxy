@@ -1,6 +1,5 @@
 extern crate tokio;
 extern crate futures;
-extern crate trust_dns_resolver;
 
 pub(crate) mod util;
 mod tcppm;

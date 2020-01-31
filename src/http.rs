@@ -49,10 +49,8 @@ impl Request {
     }
 }
 
-async fn http_parser(mut sock: TcpStream) -> Result<()> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    //read header
-    sock.set_nodelay(true)?;
+async fn read_header(sock: &mut TcpStream) -> Result<Vec<u8>> {
+    use tokio::io::AsyncReadExt;
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
     while !(header.len() > 4 && header[header.len() - 4..] == b"\r\n\r\n"[..]) {
         header.push(sock.read_u8().await?);
@@ -62,7 +60,15 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 "header too long",
             ));
         }
-    }
+    };
+    Ok(header)
+}
+
+async fn http_parser(mut sock: TcpStream) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+    //read header
+    sock.set_nodelay(true)?;
+    let header = read_header(&mut sock).await?;
     let request = String::from_utf8(header).or(Err(io::Error::new(
         io::ErrorKind::InvalidData,
         "request not utf8",

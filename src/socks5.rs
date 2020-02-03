@@ -51,7 +51,6 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
             IpAddr::from(addr)
         },
         3 => {
-            use std::net::ToSocketAddrs;
             let len = sock.read_u8().await? as usize;
             let mut domain = vec![0u8; len];
             sock.read_exact(domain.as_mut_slice()).await?;

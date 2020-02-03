@@ -5,7 +5,6 @@ use tokio;
 use std::net::{ToSocketAddrs, SocketAddr};
 
 pub async fn tcp_tranciever(mut src: TcpStream, mut dst: TcpStream) -> Result<()> {
-    println!("tranciever");
     src.set_nodelay(true)?;
     dst.set_nodelay(true)?;
     let mut src_buf = [0u8; 2000];
@@ -30,7 +29,6 @@ pub async fn tcp_tranciever(mut src: TcpStream, mut dst: TcpStream) -> Result<()
 pub async fn resolve_sockaddr<S: Into<String>>(addr_port: S) -> Result<SocketAddr> {
     let string_addr_port = addr_port.into();
     let addrs = tokio::task::spawn_blocking(move || {
-        dbg!(&string_addr_port);
         string_addr_port.to_socket_addrs()
     }).await?;
     match addrs {

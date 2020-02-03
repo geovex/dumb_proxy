@@ -1,3 +1,4 @@
+
 use tokio::io::Result;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
@@ -95,6 +96,8 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     Ok(())
 }
 
+
+#[allow(dead_code)]
 pub async fn socks5(src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {

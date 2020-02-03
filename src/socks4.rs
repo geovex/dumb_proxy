@@ -45,6 +45,7 @@ async fn socks4_parser(mut sock: TcpStream) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn socks4(src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {

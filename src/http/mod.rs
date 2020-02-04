@@ -287,10 +287,10 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
         "CONNECT" => {
             let sock_addr = util::resolve_sockaddr(&request.url).await?;
             dbg!(&sock_addr);
-            let dst_sock = TcpStream::connect(&sock_addr).await?;
+            let mut dst_sock = TcpStream::connect(&sock_addr).await?;
             let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
             sock.write_all(reply.as_bytes()).await?;
-            util::tcp_tranciever(sock, dst_sock).await?;
+            util::tcp_tranciever(&mut sock, &mut dst_sock).await?;
             //FIXME handle errors
             //FIXME handle keepalive
         }

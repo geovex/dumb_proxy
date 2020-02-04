@@ -38,7 +38,7 @@ async fn socks4_parser(mut sock: TcpStream) -> Result<()> {
     let dst = TcpStream::connect(&dst_addr).await;
     if dst.is_ok() {
         sock.write_all(&GOOD_REPLY).await?;
-        util::tcp_tranciever(sock, dst.unwrap()).await.ok();
+        util::tcp_tranciever(&mut sock, &mut dst.unwrap()).await.ok();
     } else {
         sock.write_all(&BAD_REPLY).await.ok();
     };

@@ -71,7 +71,7 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     };
     dbg!(&ipaddr);
     let port = sock.read_u16().await?;
-    let dest = TcpStream::connect(&SocketAddr::new(ipaddr, port)).await?;
+    let mut dest = TcpStream::connect(&SocketAddr::new(ipaddr, port)).await?;
     let dst_local_addr = dest.local_addr()?;
     sock.write_all(&[0x5, 0x0, 0x0]).await?;
     let reply_addr = match dst_local_addr {
@@ -91,7 +91,7 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
         },
     };
     sock.write_all(&reply_addr).await?;
-    util::tcp_tranciever(sock, dest).await?;
+    util::tcp_tranciever(&mut sock, &mut dest).await?;
     Ok(())
 }
 

@@ -13,7 +13,7 @@ lazy_static! {
     static ref FIRST_RESPONSE_LINE: Regex =
         Regex::new(r"HTTP/(?P<ver>[0-9\.]+) (?P<status>[0-9]+) (?P<phrase>.+)").unwrap();
     static ref HTTP_URL: Regex =
-        Regex::new(r"http://(?P<domain>[^ :/]+)(?P<port>:[0-9]+)?(?P<path>/[^ ]+)").unwrap();
+        Regex::new(r"http://(?P<domain>[^ :/]+)(?P<port>:[0-9]+)?(?P<path>/[^ ]*)").unwrap();
     static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
 }
 

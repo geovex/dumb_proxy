@@ -11,3 +11,6 @@ tokio = {version = "0.2", features = ["full"] }
 futures = "0.3"
 regex = "1"
 lazy_static = "1.4"
+config = {version = "0.10", features = ["toml", "yaml"]}
+serde = "1.0"
+serde_derive = "1.0"

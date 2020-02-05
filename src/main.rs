@@ -2,16 +2,20 @@ extern crate tokio;
 extern crate futures;
 extern crate regex;
 extern crate lazy_static;
+extern crate config;
+extern crate serde;
+extern crate serde_derive;
 
 pub(crate) mod util;
 mod tcppm;
 mod socks4;
 mod socks5;
 mod http;
+mod config_loader;
+mod config_spawner;
 
 #[tokio::main]
 async fn main() {
-    //tcppm(6666, "127.0.0.1:6667".parse().unwrap()).await;
-    //socks5::socks5(6666).await;
-    http::http(6666).await;
+    let c = config_loader::load_config("config/default.toml");
+    config_spawner::spawn(c).await;
 }

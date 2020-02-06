@@ -18,5 +18,6 @@ pub async fn spawn(config: Config) {
     for (_k, v) in config.tcppm {
         joins.push(tokio::spawn(async move {super::tcppm::tcppm(v.port, super::util::resolve_sockaddr(v.target).await.unwrap()).await}));
     }
+    joins.shrink_to_fit();
     ::futures::future::join_all(joins).await;
 }

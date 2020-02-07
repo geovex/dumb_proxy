@@ -140,7 +140,7 @@ async fn chunked_transiever(src: &mut TcpStream, dst: &mut TcpStream) -> Result<
     }
 }
 
-async fn read_header(sock: &mut TcpStream) -> Result<Vec<u8>> {
+async fn read_header(sock: &mut TcpStream) -> Result<String> {
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
     while !(header.len() > 4 && header[header.len() - 4..] == b"\r\n\r\n"[..]) {
         header.push(sock.read_u8().await?);
@@ -151,7 +151,10 @@ async fn read_header(sock: &mut TcpStream) -> Result<Vec<u8>> {
             ));
         }
     }
-    Ok(header)
+    Ok(String::from_utf8(header).or(Err(io::Error::new(
+        io::ErrorKind::InvalidData,
+        "header not utf8",
+    )))?)
 }
 async fn read_line(sock: &mut TcpStream) -> Result<String> {
     let mut result = Vec::new();
@@ -172,11 +175,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
     //read header
     sock.set_nodelay(true)?;
     let header = read_header(&mut sock).await?;
-    let request = String::from_utf8(header).or(Err(io::Error::new(
-        io::ErrorKind::InvalidData,
-        "request not utf8",
-    )))?;
-    let request = Request::from_string(request).ok_or(io::Error::new(
+    let request = Request::from_string(header).ok_or(io::Error::new(
         io::ErrorKind::InvalidData,
         "invalid request",
     ))?;
@@ -201,15 +200,11 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
             dst.write_all(bin_request.as_bytes()).await?;
             //check response
             let response = read_header(&mut dst).await?;
-            let response = String::from_utf8(response).or(Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "invalid utf8 response",
-            )))?;
             let response = Response::from_string(response).ok_or(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "invalid response",
             ))?;
-            if response.status>=300 && response.status<400 {
+            if response.status >= 300 && response.status < 400 {
                 sock.write_all(response.to_string().as_bytes()).await?;
                 return Ok(());
             }
@@ -263,15 +258,11 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
             }
             //process response
             let response_header = read_header(&mut dst).await?;
-            let responce = String::from_utf8(response_header).or(Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "responce not utf8",
-            )))?;
-            let response = Response::from_string(responce).ok_or(io::Error::new(
+            let response = Response::from_string(response_header).ok_or(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "invalid response",
             ))?;
-            if response.status>=300 && response.status<400 {
+            if response.status >= 300 && response.status < 400 {
                 sock.write_all(response.to_string().as_bytes()).await?;
                 return Ok(());
             }

@@ -40,3 +40,20 @@ impl Headers {
             .push((key.as_ref().to_string(), value.as_ref().to_string()))
     }
 }
+
+use regex::Regex;
+use lazy_static::lazy_static;
+lazy_static!{
+    static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
+}
+
+impl Headers {
+    pub fn is_chuncked(&self) -> bool {
+        let te = self.combined_value("Transfer-Encoding").unwrap_or(String::new());
+        CHUNKED.captures(te.as_str()).is_some()
+    }
+    pub fn content_length(&self) -> Option<u128> {
+        let cl = self.combined_value("Content-Length").unwrap_or(String::new());
+        cl.parse().ok()
+    }
+}

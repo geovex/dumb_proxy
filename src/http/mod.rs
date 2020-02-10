@@ -130,20 +130,12 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 return Ok(());
             }
             //check response format (contet-length or chunked)
-            if let Some(size_str) = response.headers.combined_value("Content-Length") {
-                let length: u128 = size_str.parse().or(Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "invalid content length",
-                )))?;
+            if let Some(length) = response.headers.content_length() {
                 sock.write_all(response.to_string().as_bytes()).await?;
                 limited_transiever(&mut sock, &mut dst, length).await?;
-            } else if let Some(transfer_encoding) =
-                response.headers.combined_value("Transfer-Encoding")
-            {
-                if CHUNKED.captures(transfer_encoding.as_str()).is_some() {
-                    sock.write_all(response.to_string().as_bytes()).await?;
-                    chunked_transiever(&mut sock, &mut dst).await?;
-                }
+            } else if response.headers.is_chuncked() {
+                sock.write_all(response.to_string().as_bytes()).await?;
+                chunked_transiever(&mut sock, &mut dst).await?;
             }
         }
         "POST" => {
@@ -162,20 +154,12 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
             new_request.url = target_captures["path"].to_string();
             //dst.write_all()
             // check request format (content-length or chunked)
-            if let Some(size_str) = request.headers.combined_value("Content-Length") {
-                let length: u128 = size_str.parse().or(Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "invalid content-length",
-                )))?;
+            if let Some(length) = request.headers.content_length() {
                 dst.write_all(new_request.to_string().as_bytes()).await?;
                 limited_transiever(&mut dst, &mut sock, length).await?;
-            } else if let Some(transfer_encoding) =
-                request.headers.combined_value("Transfer-Encoding")
-            {
+            } else if request.headers.is_chuncked() {
                 dst.write_all(new_request.to_string().as_bytes()).await?;
-                if CHUNKED.captures(transfer_encoding.as_str()).is_some() {
-                    chunked_transiever(&mut dst, &mut sock).await?;
-                }
+                chunked_transiever(&mut dst, &mut sock).await?;
             }
             //process response
             let response_header = read_header(&mut dst).await?;
@@ -188,20 +172,12 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 return Ok(());
             }
             //check response format (contet-length or chunked)
-            if let Some(size_str) = response.headers.combined_value("Content-Length") {
-                let length: u128 = size_str.parse().or(Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "invalid content length",
-                )))?;
+            if let Some(length) = response.headers.content_length() {
                 sock.write_all(response.to_string().as_bytes()).await?;
                 limited_transiever(&mut sock, &mut dst, length).await?;
-            } else if let Some(transfer_encoding) =
-                response.headers.combined_value("Transfer-Encoding")
-            {
+            } else if response.headers.is_chuncked() {
                 sock.write_all(response.to_string().as_bytes()).await?;
-                if CHUNKED.captures(transfer_encoding.as_str()).is_some() {
-                    chunked_transiever(&mut sock, &mut dst).await?;
-                }
+                chunked_transiever(&mut sock, &mut dst).await?;
             }
         }
         "CONNECT" => {

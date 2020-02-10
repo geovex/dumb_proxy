@@ -100,6 +100,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
         io::ErrorKind::InvalidData,
         "invalid request",
     )))?;
+    dbg!(&request);
     //analyze request
     match request.method.as_str() {
         "GET" => {
@@ -125,12 +126,12 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 io::ErrorKind::InvalidData,
                 "invalid response",
             )))?;
+            dbg!(&response);
+            sock.write_all(response.to_string().as_bytes()).await?;
             //check response format (contet-length or chunked)
             if let Some(length) = response.headers.content_length() {
-                sock.write_all(response.to_string().as_bytes()).await?;
                 limited_transiever(&mut sock, &mut dst, length).await?;
             } else if response.headers.is_chuncked() {
-                sock.write_all(response.to_string().as_bytes()).await?;
                 chunked_transiever(&mut sock, &mut dst).await?;
             }
         }
@@ -149,12 +150,11 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
             let mut new_request = request.clone();
             new_request.url = target_captures["path"].to_string();
             //dst.write_all()
+            dst.write_all(new_request.to_string().as_bytes()).await?;
             // check request format (content-length or chunked)
             if let Some(length) = request.headers.content_length() {
-                dst.write_all(new_request.to_string().as_bytes()).await?;
                 limited_transiever(&mut dst, &mut sock, length).await?;
             } else if request.headers.is_chuncked() {
-                dst.write_all(new_request.to_string().as_bytes()).await?;
                 chunked_transiever(&mut dst, &mut sock).await?;
             }
             //process response
@@ -163,12 +163,12 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 io::ErrorKind::InvalidData,
                 "invalid response",
             )))?;
+            dbg!(&response);
+            sock.write_all(response.to_string().as_bytes()).await?;
             //check response format (contet-length or chunked)
             if let Some(length) = response.headers.content_length() {
-                sock.write_all(response.to_string().as_bytes()).await?;
                 limited_transiever(&mut sock, &mut dst, length).await?;
             } else if response.headers.is_chuncked() {
-                sock.write_all(response.to_string().as_bytes()).await?;
                 chunked_transiever(&mut sock, &mut dst).await?;
             }
         }

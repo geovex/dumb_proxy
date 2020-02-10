@@ -1,13 +1,14 @@
 use super::headers::Headers;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::fmt;
 
 lazy_static! {
     static ref FIRST_RESPONSE_LINE: Regex =
         Regex::new(r"HTTP/(?P<ver>[0-9\.]+) (?P<status>[0-9]+) (?P<phrase>.+)").unwrap();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Response {
     pub http_version: String,
     pub status: u16,
@@ -38,5 +39,12 @@ impl Response {
             self.status_phrase,
             self.headers.to_string()
         )
+    }
+}
+
+impl fmt::Debug for Response {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "{} {} {}", self.http_version, self.status, self.status_phrase)?;
+        write!(f, "{:?}", self.headers)
     }
 }

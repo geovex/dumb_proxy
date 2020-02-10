@@ -1,6 +1,7 @@
 use super::headers::Headers;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::fmt;
 
 lazy_static! {
     static ref FIRST_REQUEST_LINE: Regex =
@@ -11,7 +12,7 @@ lazy_static! {
     static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Request {
     pub method: String,
     pub url: String,
@@ -37,5 +38,12 @@ impl Request {
             self.http_version,
             self.headers.to_string()
         )
+    }
+}
+
+impl fmt::Debug for Request {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "{} {} HTTP/{}", self.method, self.url, self.http_version)?;
+        write!(f, "{:?}", self.headers)
     }
 }

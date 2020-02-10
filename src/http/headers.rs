@@ -1,4 +1,5 @@
-#[derive(Debug, Clone)]
+use std::fmt;
+#[derive(Clone)]
 pub struct Headers {
     headers: Vec<(String, String)>,
 }
@@ -38,6 +39,16 @@ impl Headers {
     {
         self.headers
             .push((key.as_ref().to_string(), value.as_ref().to_string()))
+    }
+}
+
+impl fmt::Debug for Headers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for h in &self.headers[..self.headers.len()-1] {
+            writeln!(f, "{}: {}", h.0, h.1)?;
+        }
+        let h = &self.headers[self.headers.len()-1];
+        write!(f, "{}: {}", h.0, h.1)
     }
 }
 

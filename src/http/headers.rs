@@ -1,10 +1,3 @@
-use lazy_static::lazy_static;
-use regex::Regex;
-
-lazy_static! {
-    static ref HEADER: Regex = Regex::new(r"(?P<key>[^:]+): (?P<value>.*)").unwrap();
-}
-
 #[derive(Debug, Clone)]
 pub struct Headers {
     headers: Vec<(String, String)>,
@@ -47,5 +40,3 @@ impl Headers {
             .push((key.as_ref().to_string(), value.as_ref().to_string()))
     }
 }
-
-//tests

@@ -11,13 +11,8 @@ pub struct Headers {
 }
 
 impl Headers {
-    pub fn from_lines(lines: &[&str]) -> Option<Headers> {
-        let mut headers = Vec::new();
-        for line in lines {
-            let captures = HEADER.captures(line)?;
-            headers.push((captures["key"].into(), captures["value"].into()));
-        }
-        Some(Headers { headers })
+    pub fn new() -> Headers {
+        Headers { headers: Vec::new() }
     }
 
     pub fn to_string(&self) -> String {
@@ -38,7 +33,9 @@ impl Headers {
         if result.len() > 0 {
             result = result[..result.len() - 2].to_string();
             Some(result)
-        } else { None }
+        } else {
+            None
+        }
     }
 
     pub fn insert_header<S1, S2>(&mut self, key: S1, value: S2)

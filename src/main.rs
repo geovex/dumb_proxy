@@ -5,6 +5,7 @@ extern crate lazy_static;
 extern crate config;
 extern crate serde;
 extern crate serde_derive;
+extern crate nom;
 
 pub(crate) mod util;
 mod tcppm;

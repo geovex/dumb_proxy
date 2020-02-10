@@ -7,98 +7,19 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, Result};
 use tokio::net::{TcpListener, TcpStream};
 
 lazy_static! {
-    static ref FIRST_REQUEST_LINE: Regex =
-        Regex::new(r"(?P<method>GET|POST|CONNECT) (?P<url>[^ ]+)( HTTP/(?P<ver>[0-9\.]+))?")
-            .unwrap();
-    static ref FIRST_RESPONSE_LINE: Regex =
-        Regex::new(r"HTTP/(?P<ver>[0-9\.]+) (?P<status>[0-9]+) (?P<phrase>.+)").unwrap();
     static ref HTTP_URL: Regex =
         Regex::new(r"http://(?P<domain>[^ :/]+)(?P<port>:[0-9]+)?(?P<path>/[^ ]*)").unwrap();
     static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
 }
 
 mod headers;
-use headers::Headers;
+mod request;
+mod response;
+pub(self) mod parser;
 
 const INITIAL_HEADER_CAPACITY: usize = 512;
 const MAX_HEADER_HEADER_CAPACITY: usize = 64 * 1024;
 
-#[derive(Debug, Clone)]
-struct Request {
-    pub method: String,
-    pub url: String,
-    pub http_version: String,
-    pub headers: Headers,
-}
-
-impl Request {
-    fn from_string(request: String) -> Option<Request> {
-        let lines: Vec<&str> = request.split("\r\n").collect();
-        if lines.len() < 3 {
-            return None;
-        };
-        let lines = &lines[0..lines.len() - 2]; //remove last empty lines
-        let firstline_captures = FIRST_REQUEST_LINE.captures(lines[0])?;
-        //parse headers
-        let headers = Headers::from_lines(&lines[1..])?;
-        Some(Request {
-            method: firstline_captures["method"].into(),
-            url: firstline_captures["url"].into(),
-            http_version: firstline_captures
-                .name("ver")
-                .map_or("", |m| m.as_str())
-                .into(),
-            headers: headers,
-        })
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} {} HTTP/{}\r\n{}\r\n",
-            self.method,
-            self.url,
-            self.http_version,
-            self.headers.to_string()
-        )
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Response {
-    pub http_version: String,
-    pub status: u16,
-    pub status_phrase: String,
-    pub headers: Headers,
-}
-
-impl Response {
-    fn from_string(response: String) -> Option<Response> {
-        let lines: Vec<&str> = response.split("\r\n").collect();
-        if lines.len() < 3 {
-            return None;
-        };
-        let lines = &lines[0..lines.len() - 2]; //remove last empty line
-        let firstline_captures = FIRST_RESPONSE_LINE.captures(lines[0])?;
-        //parse headers
-        let headers = Headers::from_lines(&lines[1..])?;
-        Some(Response {
-            http_version: firstline_captures["ver"].into(),
-            status: firstline_captures["status"].parse().ok()?,
-            status_phrase: firstline_captures["phrase"].into(),
-            headers: headers,
-        })
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "HTTP/{} {} {}\r\n{}\r\n",
-            self.http_version,
-            self.status.to_string(),
-            self.status_phrase,
-            self.headers.to_string()
-        )
-    }
-}
 
 async fn limited_transiever(
     src: &mut TcpStream,
@@ -175,10 +96,10 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
     //read header
     sock.set_nodelay(true)?;
     let header = read_header(&mut sock).await?;
-    let request = Request::from_string(header).ok_or(io::Error::new(
+    let (_input, request) = parser::request(header.as_str()).or(Err(io::Error::new(
         io::ErrorKind::InvalidData,
         "invalid request",
-    ))?;
+    )))?;
     //analyze request
     match request.method.as_str() {
         "GET" => {
@@ -200,10 +121,10 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
             dst.write_all(bin_request.as_bytes()).await?;
             //check response
             let response = read_header(&mut dst).await?;
-            let response = Response::from_string(response).ok_or(io::Error::new(
+            let (_input, response) = parser::response(response.as_str()).or(Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "invalid response",
-            ))?;
+            )))?;
             if response.status >= 300 && response.status < 400 {
                 sock.write_all(response.to_string().as_bytes()).await?;
                 return Ok(());
@@ -258,10 +179,10 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
             }
             //process response
             let response_header = read_header(&mut dst).await?;
-            let response = Response::from_string(response_header).ok_or(io::Error::new(
+            let (_input, response) = parser::response(response_header.as_str()).or(Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "invalid response",
-            ))?;
+            )))?;
             if response.status >= 300 && response.status < 400 {
                 sock.write_all(response.to_string().as_bytes()).await?;
                 return Ok(());

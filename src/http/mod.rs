@@ -125,10 +125,6 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 io::ErrorKind::InvalidData,
                 "invalid response",
             )))?;
-            if response.status >= 300 && response.status < 400 {
-                sock.write_all(response.to_string().as_bytes()).await?;
-                return Ok(());
-            }
             //check response format (contet-length or chunked)
             if let Some(length) = response.headers.content_length() {
                 sock.write_all(response.to_string().as_bytes()).await?;
@@ -167,10 +163,6 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 io::ErrorKind::InvalidData,
                 "invalid response",
             )))?;
-            if response.status >= 300 && response.status < 400 {
-                sock.write_all(response.to_string().as_bytes()).await?;
-                return Ok(());
-            }
             //check response format (contet-length or chunked)
             if let Some(length) = response.headers.content_length() {
                 sock.write_all(response.to_string().as_bytes()).await?;

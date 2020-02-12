@@ -1,17 +1,13 @@
 use super::{request::Request, headers::Headers, response::Response};
 use nom::{
-    bytes::complete::{tag, take_until, take_while},
+    bytes::complete::{tag, take_until, is_not},
     character::complete::{space1, one_of, alpha1, digit1},
     multi::{fold_many0, many0},
     sequence::tuple,
     IResult,
 };
 fn token(input: &str) -> IResult<&str, &str> {
-    fn token_char(c: char) -> bool {
-        const SEPARATOR: &str = "()<>@,;:\\\"/[]?={} \t";
-        c > '\x1f' && c != '\x7f' && !(SEPARATOR.contains(c))
-    }
-    take_while(token_char)(input)
+    is_not("\x1f\x7f()<>@,;:\\\"/[]?={} \t")(input)
 }
 
 fn header_line(input: &str) -> IResult<&str, (&str, String)> {

@@ -1,30 +1,23 @@
-use super::{request::Request, headers::Headers, response::Response};
+use super::{headers::Headers, request::Request, response::Response};
 use nom::{
-    bytes::complete::{tag, take_until, is_not},
-    character::complete::{space1, one_of, alpha1, digit1},
-    multi::{fold_many0, many0},
+    bytes::complete::{is_not, tag, take_until},
+    character::complete::{alpha1, digit1, one_of, space1},
+    multi::many0,
     sequence::tuple,
-    IResult,
+    IResult, combinator::recognize,
 };
 fn token(input: &str) -> IResult<&str, &str> {
     is_not("\x1f\x7f()<>@,;:\\\"/[]?={} \t")(input)
 }
 
-fn header_line(input: &str) -> IResult<&str, (&str, String)> {
-    fn value(input: &str) -> IResult<&str, String> {
-        let (input, result) = take_until("\r\n")(input)?;
-        let (input, result_legacy) = fold_many0(
-            tuple((tag("\r\n"), one_of("\t "), take_until("\r\n"))),
-            String::new(),
-            |mut acc, s| {
-                acc.push_str(s.0);
-                acc.push(s.1);
-                acc.push_str(s.2);
-                acc
-            },
-        )(input)?;
+fn header_line(input: &str) -> IResult<&str, (&str, &str)> {
+    fn value(input: &str) -> IResult<&str, &str> {
+        let (input, result) = recognize(tuple((
+            take_until("\r\n"),
+            many0(tuple((tag("\r\n"), one_of("\t "), take_until("\r\n")))),
+        )))(input)?;
         let (input, _) = tag("\r\n")(input)?;
-        Ok((input, format!("{}{}", result, result_legacy)))
+        Ok((input, result))
     }
     let (input, (header, _sep, value)) = tuple((token, tag(": "), value))(input)?;
     Ok((input, (header, value)))

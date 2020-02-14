@@ -52,7 +52,7 @@ impl fmt::Debug for Headers {
     }
 }
 
-use super::header_line_parser::value_list;
+use super::header_value_parser::value_list;
 
 impl Headers {
     pub fn is_chuncked(&self) -> bool {

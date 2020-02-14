@@ -13,7 +13,7 @@ lazy_static! {
 }
 
 mod headers;
-mod header_line_parser;
+mod header_value_parser;
 mod request;
 mod response;
 pub(self) mod parser;

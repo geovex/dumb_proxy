@@ -52,16 +52,18 @@ impl fmt::Debug for Headers {
     }
 }
 
-use regex::Regex;
-use lazy_static::lazy_static;
-lazy_static!{
-    static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
-}
+use super::header_line_parser::value_list;
 
 impl Headers {
     pub fn is_chuncked(&self) -> bool {
-        let te = self.combined_value("Transfer-Encoding").unwrap_or(String::new());
-        CHUNKED.captures(te.as_str()).is_some()
+        let te = self
+            .combined_value("Transfer-Encoding")
+            .unwrap_or(String::new());
+        if let Ok(("", list)) = value_list(te.as_str()) {
+            list.contains(&"chunked")
+        } else {
+            false
+        }
     }
     pub fn content_length(&self) -> Option<u128> {
         let cl = self.combined_value("Content-Length").unwrap_or(String::new());

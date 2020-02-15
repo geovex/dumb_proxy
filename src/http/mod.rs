@@ -189,6 +189,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 util::tcp_tranciever(&mut sock, &mut dst_sock).await?;
                 //FIXME handle errors
                 //FIXME handle keepalive
+                break;
             }
             _ => unimplemented!(),
         }

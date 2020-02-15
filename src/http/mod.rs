@@ -98,7 +98,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
     //read header
     sock.set_nodelay(true)?;
     let mut connection_pool = connection_pool::ConnectionPool::new();
-    loop {
+    'main: loop {
         let header = read_header(&mut sock).await?;
         let (_input, request) = parser::request(header.as_str()).or(Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -137,8 +137,8 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 } else if response.headers.is_chuncked() {
                     chunked_transiever(&mut sock, &mut dst).await?;
                 }
-                if !request.headers.is_keep_alive() {
-                    break;
+                if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
+                    break 'main;
                 }
             }
             "POST" => {
@@ -176,8 +176,8 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 } else if response.headers.is_chuncked() {
                     chunked_transiever(&mut sock, &mut dst).await?;
                 }
-                if !request.headers.is_keep_alive() {
-                    break;
+                if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()){
+                    break 'main;
                 }
             }
             "CONNECT" => {

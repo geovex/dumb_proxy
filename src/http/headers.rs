@@ -69,4 +69,9 @@ impl Headers {
         let cl = self.combined_value("Content-Length").unwrap_or(String::new());
         cl.parse().ok()
     }
+
+    pub fn is_keep_alive(&self) -> bool {
+        let c = self.combined_value("Connection").unwrap_or(String::new());
+        c == "keep-alive"
+    }
 }

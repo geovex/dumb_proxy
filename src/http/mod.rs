@@ -96,94 +96,99 @@ async fn read_line(sock: &mut TcpStream) -> Result<String> {
 async fn http_parser(mut sock: TcpStream) -> Result<()> {
     //read header
     sock.set_nodelay(true)?;
-    let header = read_header(&mut sock).await?;
-    let (_input, request) = parser::request(header.as_str()).or(Err(io::Error::new(
-        io::ErrorKind::InvalidData,
-        "invalid request",
-    )))?;
-    dbg!(&request);
-    //analyze request
-    match request.method.as_str() {
-        "GET" => {
-            let target_captures = HTTP_URL
-                .captures(request.url.as_str())
-                .ok_or(io::Error::new(io::ErrorKind::InvalidData, "invalid url"))?;
-            let to_resolve = format!(
-                "{}{}",
-                &target_captures["domain"],
-                target_captures.name("port").map_or(":80", |m| m.as_str())
-            );
-            let target_sockaddr = util::resolve_sockaddr(&to_resolve).await?;
-            let mut dst = TcpStream::connect(target_sockaddr).await?;
-            //modify request
-            let mut new_request = request.clone();
-            new_request.url = target_captures["path"].to_string();
-            //send request
-            let bin_request = new_request.to_string();
-            dst.write_all(bin_request.as_bytes()).await?;
-            //check response
-            let response = read_header(&mut dst).await?;
-            let (_input, response) = parser::response(response.as_str()).or(Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "invalid response",
-            )))?;
-            dbg!(&response);
-            sock.write_all(response.to_string().as_bytes()).await?;
-            //check response format (contet-length or chunked)
-            if let Some(length) = response.headers.content_length() {
-                limited_transiever(&mut sock, &mut dst, length).await?;
-            } else if response.headers.is_chuncked() {
-                chunked_transiever(&mut sock, &mut dst).await?;
+    loop {
+        let header = read_header(&mut sock).await?;
+        let (_input, request) = parser::request(header.as_str()).or(Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid request",
+        )))?;
+        dbg!(&request);
+        //analyze request
+        match request.method.as_str() {
+            "GET" => {
+                let target_captures = HTTP_URL
+                    .captures(request.url.as_str())
+                    .ok_or(io::Error::new(io::ErrorKind::InvalidData, "invalid url"))?;
+                let to_resolve = format!(
+                    "{}{}",
+                    &target_captures["domain"],
+                    target_captures.name("port").map_or(":80", |m| m.as_str())
+                );
+                let target_sockaddr = util::resolve_sockaddr(&to_resolve).await?;
+                let mut dst = TcpStream::connect(target_sockaddr).await?;
+                //modify request
+                let mut new_request = request.clone();
+                new_request.url = target_captures["path"].to_string();
+                //send request
+                let bin_request = new_request.to_string();
+                dst.write_all(bin_request.as_bytes()).await?;
+                //check response
+                let response = read_header(&mut dst).await?;
+                let (_input, response) = parser::response(response.as_str()).or(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid response",
+                )))?;
+                dbg!(&response);
+                sock.write_all(response.to_string().as_bytes()).await?;
+                //check response format (contet-length or chunked)
+                if let Some(length) = response.headers.content_length() {
+                    limited_transiever(&mut sock, &mut dst, length).await?;
+                } else if response.headers.is_chuncked() {
+                    chunked_transiever(&mut sock, &mut dst).await?;
+                }
             }
-        }
-        "POST" => {
-            let target_captures = HTTP_URL
-                .captures(request.url.as_str())
-                .ok_or(io::Error::new(io::ErrorKind::InvalidData, "invalid url"))?;
-            let to_resolve = format!(
-                "{}{}",
-                &target_captures["domain"],
-                target_captures.name("port").map_or(":80", |m| m.as_str())
-            );
-            let target_sockaddr = util::resolve_sockaddr(&to_resolve).await?;
-            let mut dst = TcpStream::connect(target_sockaddr).await?;
-            //modify request
-            let mut new_request = request.clone();
-            new_request.url = target_captures["path"].to_string();
-            //dst.write_all()
-            dst.write_all(new_request.to_string().as_bytes()).await?;
-            // check request format (content-length or chunked)
-            if let Some(length) = request.headers.content_length() {
-                limited_transiever(&mut dst, &mut sock, length).await?;
-            } else if request.headers.is_chuncked() {
-                chunked_transiever(&mut dst, &mut sock).await?;
+            "POST" => {
+                let target_captures = HTTP_URL
+                    .captures(request.url.as_str())
+                    .ok_or(io::Error::new(io::ErrorKind::InvalidData, "invalid url"))?;
+                let to_resolve = format!(
+                    "{}{}",
+                    &target_captures["domain"],
+                    target_captures.name("port").map_or(":80", |m| m.as_str())
+                );
+                let target_sockaddr = util::resolve_sockaddr(&to_resolve).await?;
+                let mut dst = TcpStream::connect(target_sockaddr).await?;
+                //modify request
+                let mut new_request = request.clone();
+                new_request.url = target_captures["path"].to_string();
+                //dst.write_all()
+                dst.write_all(new_request.to_string().as_bytes()).await?;
+                // check request format (content-length or chunked)
+                if let Some(length) = request.headers.content_length() {
+                    limited_transiever(&mut dst, &mut sock, length).await?;
+                } else if request.headers.is_chuncked() {
+                    chunked_transiever(&mut dst, &mut sock).await?;
+                }
+                //process response
+                let response_header = read_header(&mut dst).await?;
+                let (_input, response) = parser::response(response_header.as_str()).or(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid response",
+                )))?;
+                dbg!(&response);
+                sock.write_all(response.to_string().as_bytes()).await?;
+                //check response format (contet-length or chunked)
+                if let Some(length) = response.headers.content_length() {
+                    limited_transiever(&mut sock, &mut dst, length).await?;
+                } else if response.headers.is_chuncked() {
+                    chunked_transiever(&mut sock, &mut dst).await?;
+                }
             }
-            //process response
-            let response_header = read_header(&mut dst).await?;
-            let (_input, response) = parser::response(response_header.as_str()).or(Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "invalid response",
-            )))?;
-            dbg!(&response);
-            sock.write_all(response.to_string().as_bytes()).await?;
-            //check response format (contet-length or chunked)
-            if let Some(length) = response.headers.content_length() {
-                limited_transiever(&mut sock, &mut dst, length).await?;
-            } else if response.headers.is_chuncked() {
-                chunked_transiever(&mut sock, &mut dst).await?;
+            "CONNECT" => {
+                let sock_addr = util::resolve_sockaddr(&request.url).await?;
+                dbg!(&sock_addr);
+                let mut dst_sock = TcpStream::connect(&sock_addr).await?;
+                let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
+                sock.write_all(reply.as_bytes()).await?;
+                util::tcp_tranciever(&mut sock, &mut dst_sock).await?;
+                //FIXME handle errors
+                //FIXME handle keepalive
             }
+            _ => unimplemented!(),
         }
-        "CONNECT" => {
-            let sock_addr = util::resolve_sockaddr(&request.url).await?;
-            dbg!(&sock_addr);
-            let mut dst_sock = TcpStream::connect(&sock_addr).await?;
-            let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
-            sock.write_all(reply.as_bytes()).await?;
-            util::tcp_tranciever(&mut sock, &mut dst_sock).await?;
-            //FIXME handle errors
-            //FIXME handle keepalive
+        if !request.headers.is_keep_alive() {
+            break;
         }
-        _ => unimplemented!(),
     }
     //println!("{}", request);
     Ok(())

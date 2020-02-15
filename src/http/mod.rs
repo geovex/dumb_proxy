@@ -16,6 +16,7 @@ mod headers;
 mod header_value_parser;
 mod request;
 mod response;
+mod connection_pool;
 pub(self) mod parser;
 
 const INITIAL_HEADER_CAPACITY: usize = 512;
@@ -96,6 +97,7 @@ async fn read_line(sock: &mut TcpStream) -> Result<String> {
 async fn http_parser(mut sock: TcpStream) -> Result<()> {
     //read header
     sock.set_nodelay(true)?;
+    let mut connection_pool = connection_pool::ConnectionPool::new();
     loop {
         let header = read_header(&mut sock).await?;
         let (_input, request) = parser::request(header.as_str()).or(Err(io::Error::new(
@@ -114,8 +116,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                     &target_captures["domain"],
                     target_captures.name("port").map_or(":80", |m| m.as_str())
                 );
-                let target_sockaddr = util::resolve_sockaddr(&to_resolve).await?;
-                let mut dst = TcpStream::connect(target_sockaddr).await?;
+                let mut dst = connection_pool.connnect_or_reuse(to_resolve).await?;
                 //modify request
                 let mut new_request = request.clone();
                 new_request.url = target_captures["path"].to_string();
@@ -136,6 +137,9 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 } else if response.headers.is_chuncked() {
                     chunked_transiever(&mut sock, &mut dst).await?;
                 }
+                if !request.headers.is_keep_alive() {
+                    break;
+                }
             }
             "POST" => {
                 let target_captures = HTTP_URL
@@ -146,8 +150,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                     &target_captures["domain"],
                     target_captures.name("port").map_or(":80", |m| m.as_str())
                 );
-                let target_sockaddr = util::resolve_sockaddr(&to_resolve).await?;
-                let mut dst = TcpStream::connect(target_sockaddr).await?;
+                let mut dst = connection_pool.connnect_or_reuse(to_resolve).await?;
                 //modify request
                 let mut new_request = request.clone();
                 new_request.url = target_captures["path"].to_string();
@@ -173,6 +176,9 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 } else if response.headers.is_chuncked() {
                     chunked_transiever(&mut sock, &mut dst).await?;
                 }
+                if !request.headers.is_keep_alive() {
+                    break;
+                }
             }
             "CONNECT" => {
                 let sock_addr = util::resolve_sockaddr(&request.url).await?;
@@ -185,9 +191,6 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                 //FIXME handle keepalive
             }
             _ => unimplemented!(),
-        }
-        if !request.headers.is_keep_alive() {
-            break;
         }
     }
     //println!("{}", request);

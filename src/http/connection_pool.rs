@@ -49,7 +49,7 @@ impl ConnectionPool {
             connections: Mutex::new(HashMap::new()),
         }
     }
-    pub async fn connnect_or_reuse<'cp>(
+    pub async fn connect_or_reuse<'cp>(
         &'cp mut self,
         domain_port: String,
     ) -> Result<SockRef<'cp>> {

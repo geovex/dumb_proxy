@@ -116,7 +116,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                     &target_captures["domain"],
                     target_captures.name("port").map_or(":80", |m| m.as_str())
                 );
-                let mut dst = connection_pool.connnect_or_reuse(to_resolve).await?;
+                let mut dst = connection_pool.connect_or_reuse(to_resolve).await?;
                 //modify request
                 let mut new_request = request.clone();
                 new_request.url = target_captures["path"].to_string();
@@ -150,7 +150,7 @@ async fn http_parser(mut sock: TcpStream) -> Result<()> {
                     &target_captures["domain"],
                     target_captures.name("port").map_or(":80", |m| m.as_str())
                 );
-                let mut dst = connection_pool.connnect_or_reuse(to_resolve).await?;
+                let mut dst = connection_pool.connect_or_reuse(to_resolve).await?;
                 //modify request
                 let mut new_request = request.clone();
                 new_request.url = target_captures["path"].to_string();

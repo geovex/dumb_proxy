@@ -4,7 +4,7 @@ use regex::Regex;
 use std::io;
 use tokio;
 use tokio::io::Result as IoResult;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
 lazy_static! {
@@ -27,11 +27,11 @@ const MAX_HEADER_HEADER_CAPACITY: usize = 64 * 1024;
 
 type HttpResult<T> = Result<T, HttpError>;
 
-async fn limited_transiever(
-    src: &mut TcpStream,
-    dst: &mut TcpStream,
-    mut limit: u128,
-) -> HttpResult<()> {
+async fn limited_transiever<R, W>(src: &mut W, dst: &mut R, mut limit: u128) -> HttpResult<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     let mut dst_buf = [0u8; 2000];
     while limit > 0 {
         let limited_value = (if limit > 2000 { 2000 } else { limit }) as usize;
@@ -50,7 +50,11 @@ async fn limited_transiever(
     Ok(())
 }
 
-async fn chunked_transiever(src: &mut TcpStream, dst: &mut TcpStream) -> HttpResult<()> {
+async fn chunked_transiever<R, W>(src: &mut W, dst: &mut R) -> HttpResult<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     loop {
         //read_chunk_size
         let length_str = read_line(dst).await.or(Err(HttpError::Tranciever))?;
@@ -86,7 +90,10 @@ async fn read_header(sock: &mut TcpStream) -> HttpResult<String> {
     }
     Ok(String::from_utf8(header).or(Err(HttpError::HeaderNotUtf8))?)
 }
-async fn read_line(sock: &mut TcpStream) -> IoResult<String> {
+async fn read_line<R>(sock: &mut R) -> IoResult<String>
+where
+    R: AsyncRead + Unpin,
+{
     let mut result = Vec::new();
     loop {
         result.push(sock.read_u8().await?);
@@ -143,9 +150,9 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 //check response format (contet-length or chunked)
                 if let Some(length) = response.headers.content_length() {
-                    limited_transiever(&mut sock, &mut dst, length).await?;
+                    limited_transiever(&mut sock, &mut *dst, length).await?;
                 } else if response.headers.is_chuncked() {
-                    chunked_transiever(&mut sock, &mut dst).await?;
+                    chunked_transiever(&mut sock, &mut *dst).await?;
                 }
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;
@@ -173,9 +180,9 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 // check request format (content-length or chunked)
                 if let Some(length) = request.headers.content_length() {
-                    limited_transiever(&mut dst, &mut sock, length).await?;
+                    limited_transiever(&mut *dst, &mut sock, length).await?;
                 } else if request.headers.is_chuncked() {
-                    chunked_transiever(&mut dst, &mut sock).await?;
+                    chunked_transiever(&mut *dst, &mut sock).await?;
                 }
                 //process response
                 let response_header = read_header(&mut dst).await?;
@@ -187,9 +194,9 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 //check response format (contet-length or chunked)
                 if let Some(length) = response.headers.content_length() {
-                    limited_transiever(&mut sock, &mut dst, length).await?;
+                    limited_transiever(&mut sock, &mut *dst, length).await?;
                 } else if response.headers.is_chuncked() {
-                    chunked_transiever(&mut sock, &mut dst).await?;
+                    chunked_transiever(&mut sock, &mut *dst).await?;
                 }
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;

@@ -17,6 +17,7 @@ use errors::HttpError;
 mod connection_pool;
 mod header_value_parser;
 mod headers;
+mod headers_utils;
 pub(self) mod parser;
 mod request;
 mod response;

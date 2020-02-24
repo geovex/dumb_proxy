@@ -26,7 +26,7 @@ const MAX_HEADER_HEADER_CAPACITY: usize = 64 * 1024;
 
 type HttpResult<T> = Result<T, HttpError>;
 
-async fn limited_transiever<R, W>(src: &mut W, dst: &mut R, mut limit: u128) -> HttpResult<()>
+async fn limited_transceiver<R, W>(src: &mut W, dst: &mut R, mut limit: u128) -> HttpResult<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -49,7 +49,7 @@ where
     Ok(())
 }
 
-async fn chunked_transiever<R, W>(src: &mut W, dst: &mut R) -> HttpResult<()>
+async fn chunked_transceiver<R, W>(src: &mut W, dst: &mut R) -> HttpResult<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -72,7 +72,7 @@ where
             src.write_all(b"\r\n")
                 .await
                 .or(Err(HttpError::Tranciever))?;
-            limited_transiever(src, dst, length + 2)
+            limited_transceiver(src, dst, length + 2)
                 .await
                 .or(Err(HttpError::Tranciever))?;
         }
@@ -149,9 +149,9 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 //check response format (contet-length or chunked)
                 if let Some(length) = response.headers.content_length() {
-                    limited_transiever(&mut sock, &mut *dst, length).await?;
+                    limited_transceiver(&mut sock, &mut *dst, length).await?;
                 } else if response.headers.is_chuncked() {
-                    chunked_transiever(&mut sock, &mut *dst).await?;
+                    chunked_transceiver(&mut sock, &mut *dst).await?;
                 }
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;
@@ -179,9 +179,9 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 // check request format (content-length or chunked)
                 if let Some(length) = request.headers.content_length() {
-                    limited_transiever(&mut *dst, &mut sock, length).await?;
+                    limited_transceiver(&mut *dst, &mut sock, length).await?;
                 } else if request.headers.is_chuncked() {
-                    chunked_transiever(&mut *dst, &mut sock).await?;
+                    chunked_transceiver(&mut *dst, &mut sock).await?;
                 }
                 //process response
                 let response_header = read_header(&mut dst).await?;
@@ -193,9 +193,9 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 //check response format (contet-length or chunked)
                 if let Some(length) = response.headers.content_length() {
-                    limited_transiever(&mut sock, &mut *dst, length).await?;
+                    limited_transceiver(&mut sock, &mut *dst, length).await?;
                 } else if response.headers.is_chuncked() {
-                    chunked_transiever(&mut sock, &mut *dst).await?;
+                    chunked_transceiver(&mut sock, &mut *dst).await?;
                 }
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;
@@ -213,7 +213,7 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                 sock.write_all(reply.as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
-                util::tcp_tranciever(&mut sock, &mut dst_sock)
+                util::tcp_transceiver(&mut sock, &mut dst_sock)
                     .await
                     .or(Err(HttpError::Tranciever))?;
                 //FIXME handle errors

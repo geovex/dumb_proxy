@@ -4,7 +4,7 @@ use tokio::net::TcpStream;
 use tokio;
 use std::net::{ToSocketAddrs, SocketAddr};
 
-pub async fn tcp_tranciever(src: &mut TcpStream, dst: &mut TcpStream) -> Result<()> {
+pub async fn tcp_transceiver(src: &mut TcpStream, dst: &mut TcpStream) -> Result<()> {
     src.set_nodelay(true)?;
     dst.set_nodelay(true)?;
     let mut src_buf = [0u8; 2000];

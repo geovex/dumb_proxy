@@ -91,7 +91,7 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
         },
     };
     sock.write_all(&reply_addr).await?;
-    util::tcp_tranciever(&mut sock, &mut dest).await?;
+    util::tcp_transceiver(&mut sock, &mut dest).await?;
     Ok(())
 }
 

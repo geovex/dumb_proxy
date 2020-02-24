@@ -9,7 +9,7 @@ pub async fn tcppm(src_port: u16, target: SocketAddr) {
         let (mut src, _addr) = listener.accept().await.unwrap();
         tokio::spawn(async move {
             if let Ok(mut dst) = TcpStream::connect(target).await {
-                util::tcp_tranciever(&mut src, &mut dst).await.ok();
+                util::tcp_transceiver(&mut src, &mut dst).await.ok();
             }
         });
     }

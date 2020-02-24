@@ -1,16 +1,5 @@
 use super::headers::Headers;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::fmt;
-
-lazy_static! {
-    static ref FIRST_REQUEST_LINE: Regex =
-        Regex::new(r"(?P<method>GET|POST|CONNECT) (?P<url>[^ ]+)( HTTP/(?P<ver>[0-9\.]+))?")
-            .unwrap();
-    static ref HTTP_URL: Regex =
-        Regex::new(r"http://(?P<domain>[^ :/]+)(?P<port>:[0-9]+)?(?P<path>/[^ ]*)").unwrap();
-    static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
-}
 
 #[derive(Clone)]
 pub struct Request {

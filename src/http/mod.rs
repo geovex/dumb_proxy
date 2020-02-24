@@ -10,7 +10,6 @@ use tokio::net::{TcpListener, TcpStream};
 lazy_static! {
     static ref HTTP_URL: Regex =
         Regex::new(r"http://(?P<domain>[^ :/]+)(?P<port>:[0-9]+)?(?P<path>/[^ ]*)").unwrap();
-    static ref CHUNKED: Regex = Regex::new(r"(^| |,)chunked($| |,)").unwrap();
 }
 
 pub mod errors;

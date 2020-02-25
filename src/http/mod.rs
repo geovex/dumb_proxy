@@ -80,7 +80,10 @@ where
     }
 }
 
-async fn read_header(sock: &mut TcpStream) -> HttpResult<String> {
+async fn read_header<R>(sock: &mut R) -> HttpResult<String>
+where
+    R: AsyncRead + Unpin,
+{
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
     while !(header.len() > 4 && header[header.len() - 4..] == b"\r\n\r\n"[..]) {
         header.push(sock.read_u8().await.or(Err(HttpError::HeaderIncomplete))?);
@@ -136,12 +139,11 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                 let mut new_request = request.clone();
                 new_request.url = target_captures["path"].to_string();
                 //send request
-                let bin_request = new_request.to_string();
-                dst.write_all(bin_request.as_bytes())
+                dst.write_all(new_request.to_string().as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
                 //check response
-                let response = read_header(&mut dst).await?;
+                let response = read_header(&mut *dst).await?;
                 let (_input, response) =
                     parser::response(response.as_str()).or(Err(HttpError::HeaderInvalid))?;
                 dbg!(&response);
@@ -185,7 +187,7 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                     chunked_transceiver(&mut *dst, &mut sock).await?;
                 }
                 //process response
-                let response_header = read_header(&mut dst).await?;
+                let response_header = read_header(&mut *dst).await?;
                 let (_input, response) =
                     parser::response(response_header.as_str()).or(Err(HttpError::HeaderInvalid))?;
                 dbg!(&response);

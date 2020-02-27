@@ -2,9 +2,10 @@ use super::{headers::Headers, request::Request, response::Response};
 use nom::{
     bytes::complete::{is_not, tag, take_until},
     character::complete::{alpha1, digit1, one_of, space1},
+    combinator::recognize,
     multi::many0,
     sequence::tuple,
-    IResult, combinator::recognize,
+    IResult,
 };
 fn token(input: &str) -> IResult<&str, &str> {
     is_not("\x1f\x7f()<>@,;:\\\"/[]?={} \t")(input)
@@ -49,7 +50,15 @@ pub fn request(input: &str) -> IResult<&str, Request> {
     let (input, rfl) = request_first_line(input)?;
     let (input, headers) = headers(input)?;
     let (input, _) = tag("\r\n")(input)?;
-    Ok((input, Request::new(rfl.0.to_string(), rfl.1.to_string(), rfl.2.to_string(), headers)))
+    Ok((
+        input,
+        Request::new(
+            rfl.0.to_string(),
+            rfl.1.to_string(),
+            rfl.2.to_string(),
+            headers,
+        ),
+    ))
 }
 
 fn response_first_line(input: &str) -> IResult<&str, (&str, &str, &str)> {
@@ -58,19 +67,27 @@ fn response_first_line(input: &str) -> IResult<&str, (&str, &str, &str)> {
         take_until(" "),
         space1,
         digit1,
-        space1, 
-        take_until("\r\n"), 
-        tag("\r\n")
+        space1,
+        take_until("\r\n"),
+        tag("\r\n"),
     ))(input)?;
     Ok((input, (http_version, status, phrase)))
 }
 
 pub fn response(input: &str) -> IResult<&str, Response> {
     let (input, (http_version, status, phrase)) = response_first_line(input)?;
-    let status:u16 = status.parse().unwrap();
+    let status: u16 = status.parse().unwrap();
     let (input, headers) = headers(input)?;
     let (input, _) = tag("\r\n")(input)?;
-    Ok((input, Response::new(http_version.to_string(), status, phrase.to_string(), headers)))
+    Ok((
+        input,
+        Response::new(
+            http_version.to_string(),
+            status,
+            phrase.to_string(),
+            headers,
+        ),
+    ))
 }
 
 #[cfg(test)]
@@ -117,7 +134,8 @@ mod test {
     }
     #[test]
     fn request_basic() {
-        let line = "GET http://example.net:80/ HTTP/1.1\r\nheader0: value0\r\nheader1: value1\r\n\r\n";
+        let line =
+            "GET http://example.net:80/ HTTP/1.1\r\nheader0: value0\r\nheader1: value1\r\n\r\n";
         let (rest, r) = request(line).unwrap();
         assert_eq!(rest, "");
         assert_eq!(r.method, "GET");

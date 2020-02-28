@@ -36,3 +36,10 @@ impl fmt::Debug for Request {
         write!(f, "{:?}", self.headers)
     }
 }
+
+pub struct Url{
+    pub protocol: String,
+    pub host: String,
+    pub port: u16,
+    pub path: String
+}

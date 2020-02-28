@@ -1,16 +1,10 @@
 use super::util;
 use lazy_static::lazy_static;
-use regex::Regex;
 use std::io;
 use tokio;
 use tokio::io::Result as IoResult;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-
-lazy_static! {
-    static ref HTTP_URL: Regex =
-        Regex::new(r"http://(?P<domain>[^ :/]+)(?P<port>:[0-9]+)?(?P<path>/[^ ]*)").unwrap();
-}
 
 pub mod errors;
 use errors::HttpError;
@@ -123,21 +117,16 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
         //analyze request
         match request.method.as_str() {
             "GET" => {
-                let target_captures = HTTP_URL
-                    .captures(request.url.as_str())
-                    .ok_or(HttpError::HeaderInvalid)?;
-                let to_resolve = format!(
-                    "{}{}",
-                    &target_captures["domain"],
-                    target_captures.name("port").map_or(":80", |m| m.as_str())
-                );
+                let (_rest, url) = parser::url(request.url.as_str())
+                    .or(Err(HttpError::HeaderInvalid))?;
+                let to_resolve = format!("{}:{}", url.host, url.port);
                 let mut dst = connection_pool
                     .connect_or_reuse(to_resolve)
                     .await
                     .or(Err(HttpError::TargetUnreachable))?;
                 //modify request
                 let mut new_request = request.clone();
-                new_request.url = target_captures["path"].to_string();
+                new_request.url = url.path;
                 //send request
                 dst.write_all(new_request.to_string().as_bytes())
                     .await
@@ -161,21 +150,16 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                 }
             }
             "POST" => {
-                let target_captures = HTTP_URL
-                    .captures(request.url.as_str())
-                    .ok_or(HttpError::HeaderInvalid)?;
-                let to_resolve = format!(
-                    "{}{}",
-                    &target_captures["domain"],
-                    target_captures.name("port").map_or(":80", |m| m.as_str())
-                );
+                let (_rest, url) = parser::url(request.url.as_str())
+                    .or(Err(HttpError::HeaderInvalid))?;
+                let to_resolve = format!("{}:{}", url.host, url.port);
                 let mut dst = connection_pool
                     .connect_or_reuse(to_resolve)
                     .await
                     .or(Err(HttpError::TargetUnreachable))?;
                 //modify request
                 let mut new_request = request.clone();
-                new_request.url = target_captures["path"].to_string();
+                new_request.url = url.path;
                 //dst.write_all()
                 dst.write_all(new_request.to_string().as_bytes())
                     .await

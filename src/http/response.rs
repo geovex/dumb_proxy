@@ -1,12 +1,6 @@
 use super::headers::Headers;
 use lazy_static::lazy_static;
-use regex::Regex;
 use std::fmt;
-
-lazy_static! {
-    static ref FIRST_RESPONSE_LINE: Regex =
-        Regex::new(r"HTTP/(?P<ver>[0-9\.]+) (?P<status>[0-9]+) (?P<phrase>.+)").unwrap();
-}
 
 #[derive(Clone)]
 pub struct Response {

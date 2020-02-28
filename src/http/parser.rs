@@ -1,8 +1,12 @@
-use super::{headers::Headers, request::Request, response::Response};
+use super::{
+    headers::Headers,
+    request::{Request, Url},
+    response::Response,
+};
 use nom::{
     bytes::complete::{is_not, tag, take_until},
     character::complete::{alpha1, digit1, one_of, space1},
-    combinator::recognize,
+    combinator::{opt, recognize, complete},
     multi::many0,
     sequence::tuple,
     IResult,
@@ -90,6 +94,23 @@ pub fn response(input: &str) -> IResult<&str, Response> {
     ))
 }
 
+pub fn url(input: &str) -> IResult<&str, Url> {
+    let (input, (protocol, _, domain, _, port, path)) = complete(tuple((
+        is_not(":"),
+        tag("://"),
+        is_not(":/"),
+        opt(tag(":")),
+        opt(digit1),
+        is_not(" "),
+    )))(input)?;
+    Ok((input, Url {
+        protocol: protocol.to_string(),
+        host: domain.to_string(),
+        port: port.map_or(80, |v| v.parse().unwrap()),
+        path: path.to_string()
+    }))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -159,5 +180,25 @@ mod test {
         assert_eq!(r.status, 200);
         assert_eq!(r.status_phrase, "OK");
         assert_eq!(r.headers.combined_value("header0").unwrap(), "value0")
+    }
+    #[test]
+    fn url_no_port() {
+        let line = "http://example.net/";
+        let (rest, url) = url(line).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(url.protocol, "http");
+        assert_eq!(url.host, "example.net");
+        assert_eq!(url.port, 80);
+        assert_eq!(url.path, "/");
+    }
+    #[test]
+    fn url_with_port() {
+        let line = "http://example.net:8080/path";
+        let (rest, url) = url(line).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(url.protocol, "http");
+        assert_eq!(url.host, "example.net");
+        assert_eq!(url.port, 8080);
+        assert_eq!(url.path, "/path");
     }
 }

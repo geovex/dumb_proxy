@@ -206,7 +206,7 @@ async fn http_parser(mut sock: TcpStream) -> HttpResult<()> {
                 //FIXME handle keepalive
                 break;
             }
-            _ => unimplemented!(),
+            _ => return Err(HttpError::HeaderInvalid)
         }
     }
     //println!("{}", request);

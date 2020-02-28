@@ -1,5 +1,4 @@
 use super::util;
-use lazy_static::lazy_static;
 use std::io;
 use tokio;
 use tokio::io::Result as IoResult;

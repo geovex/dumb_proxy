@@ -1,5 +1,4 @@
 use super::headers::Headers;
-use lazy_static::lazy_static;
 use std::fmt;
 
 #[derive(Clone)]

@@ -1,6 +1,5 @@
 extern crate tokio;
 extern crate futures;
-extern crate lazy_static;
 extern crate config;
 extern crate serde;
 extern crate serde_derive;

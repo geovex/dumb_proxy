@@ -6,7 +6,9 @@ pub struct Headers {
 
 impl Headers {
     pub fn new() -> Headers {
-        Headers { headers: Vec::new() }
+        Headers {
+            headers: Vec::new(),
+        }
     }
 
     pub fn to_string(&self) -> String {
@@ -44,10 +46,10 @@ impl Headers {
 
 impl fmt::Debug for Headers {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for h in &self.headers[..self.headers.len()-1] {
+        for h in &self.headers[..self.headers.len() - 1] {
             writeln!(f, "{}: {}", h.0, h.1)?;
         }
-        let h = &self.headers[self.headers.len()-1];
+        let h = &self.headers[self.headers.len() - 1];
         write!(f, "{}: {}", h.0, h.1)
     }
 }

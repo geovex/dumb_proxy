@@ -1,4 +1,5 @@
 extern crate tokio;
+extern crate tokio_io_timeout;
 extern crate futures;
 extern crate config;
 extern crate serde;

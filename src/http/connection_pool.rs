@@ -12,9 +12,9 @@ pub struct SockRef<'cp> {
 }
 
 impl SockRef<'_> {
-    pub fn close(&mut self) {
-        self.sock.take();
-    }
+    // pub fn close(&mut self) {
+    //     self.sock.take();
+    // }
 }
 
 impl Drop for SockRef<'_> {

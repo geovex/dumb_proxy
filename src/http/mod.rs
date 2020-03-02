@@ -80,7 +80,7 @@ where
     R: AsyncRead + Unpin,
 {
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
-    while !(header.len() > 4 && header[header.len() - 4..] == b"\r\n\r\n"[..]) {
+    while !(header.ends_with(b"\r\n\r\n")) {
         let byte = sock.read_u8()
             .await
             .or(Err(HttpError::HeaderIncomplete))?;
@@ -98,7 +98,7 @@ where
     let mut result = Vec::new();
     loop {
         result.push(sock.read_u8().await?);
-        if result.len() > 2 && result[result.len() - 2..] == b"\r\n"[..] {
+        if result.len() > 2 && result.ends_with(b"\r\n") {
             break;
         }
     }

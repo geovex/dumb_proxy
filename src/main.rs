@@ -5,6 +5,7 @@ extern crate config;
 extern crate serde;
 extern crate serde_derive;
 extern crate nom;
+extern crate lru_cache;
 
 pub(crate) mod util;
 mod tcppm;

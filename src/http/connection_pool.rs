@@ -1,9 +1,11 @@
 use crate::util::resolve_sockaddr;
-use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Mutex;
 use tokio::io::Result;
 use tokio::net::TcpStream;
+use lru_cache::LruCache;
+
+const LRU_CACHE_SIZE: usize = 10;
 
 pub struct SockRef<'cp> {
     sock: Option<TcpStream>,
@@ -40,13 +42,13 @@ impl DerefMut for SockRef<'_> {
 }
 
 pub struct ConnectionPool {
-    connections: Mutex<HashMap<String, TcpStream>>,
+    connections: Mutex<LruCache<String, TcpStream>>,
 }
 
 impl ConnectionPool {
     pub fn new() -> ConnectionPool {
         ConnectionPool {
-            connections: Mutex::new(HashMap::new()),
+            connections: Mutex::new(LruCache::new(LRU_CACHE_SIZE)),
         }
     }
     pub async fn connect_or_reuse<'cp>(

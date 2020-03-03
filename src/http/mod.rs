@@ -221,7 +221,7 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 timed_our_stream.write_all(reply.as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
-                util::tcp_transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
+                util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
                     .await
                     .or(Err(HttpError::Tranciever))?;
                 //FIXME handle errors

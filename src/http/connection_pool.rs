@@ -60,7 +60,9 @@ impl ConnectionPool {
             sock
         } else {
             let sockaddr = resolve_sockaddr(domain_port.clone()).await?;
-            TcpStream::connect(sockaddr).await?
+            let sock = TcpStream::connect(sockaddr).await?;
+            sock.set_nodelay(true)?;
+            sock
         };
         Ok(SockRef {
             sock: Some(sock),

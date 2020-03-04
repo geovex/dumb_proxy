@@ -151,11 +151,13 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 } else {
                     timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
                 }
-                //check response format (contet-length or chunked)
-                if let Some(length) = response.headers.content_length() {
-                    limited_transceiver(&mut timed_our_stream, &mut *dst, length).await?;
-                } else if response.headers.is_chuncked() {
-                    chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
+                if response.has_body(&request) {
+                    //check response format (contet-length or chunked)
+                    if let Some(length) = response.headers.content_length() {
+                        limited_transceiver(&mut timed_our_stream, &mut *dst, length).await?;
+                    } else if response.headers.is_chuncked() {
+                        chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
+                    }
                 }
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;
@@ -198,11 +200,13 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 } else {
                     timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
                 }
-                //check response format (contet-length or chunked)
-                if let Some(length) = response.headers.content_length() {
-                    limited_transceiver(&mut timed_our_stream, &mut *dst, length).await?;
-                } else if response.headers.is_chuncked() {
-                    chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
+                if response.has_body(&request) {
+                    //check response format (contet-length or chunked)
+                    if let Some(length) = response.headers.content_length() {
+                        limited_transceiver(&mut timed_our_stream, &mut *dst, length).await?;
+                    } else if response.headers.is_chuncked() {
+                        chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
+                    }
                 }
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;

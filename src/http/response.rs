@@ -1,4 +1,4 @@
-use super::headers::Headers;
+use super::{headers::Headers, request::Request};
 use std::fmt;
 
 #[derive(Clone)]
@@ -33,11 +33,22 @@ impl Response {
             self.headers.to_string()
         )
     }
+
+    pub fn has_body(&self, request: &Request) -> bool {
+        request.method == "HEAD"
+            || { self.status >= 100 } && (self.status < 200)
+            || self.status == 204
+            || self.status == 304
+    }
 }
 
 impl fmt::Debug for Response {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "{} {} {}", self.http_version, self.status, self.status_phrase)?;
+        writeln!(
+            f,
+            "{} {} {}",
+            self.http_version, self.status, self.status_phrase
+        )?;
         write!(f, "{:?}", self.headers)
     }
 }

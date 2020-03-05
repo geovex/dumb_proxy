@@ -122,6 +122,26 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
         dbg!(&request);
         //analyze request
         match request.method.as_str() {
+            "CONNECT" => {
+                request.headers.keep_alive_value();
+                let sock_addr = util::resolve_sockaddr(&request.url)
+                    .await
+                    .or(Err(HttpError::TargetUnreachable))?;
+                dbg!(&sock_addr);
+                let mut dst_sock = TcpStream::connect(&sock_addr)
+                    .await
+                    .or(Err(HttpError::TargetUnreachable))?;
+                let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
+                timed_our_stream.write_all(reply.as_bytes())
+                    .await
+                    .or(Err(HttpError::Internal))?;
+                util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
+                    .await
+                    .or(Err(HttpError::Tranciever))?;
+                //FIXME handle errors
+                //FIXME handle keepalive
+                break;
+            }
             "GET" => {
                 let (_rest, url) = parser::url(request.url.as_str())
                     .or(Err(HttpError::HeaderInvalid))?;
@@ -211,26 +231,6 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
                     break 'main;
                 }
-            }
-            "CONNECT" => {
-                request.headers.keep_alive_value();
-                let sock_addr = util::resolve_sockaddr(&request.url)
-                    .await
-                    .or(Err(HttpError::TargetUnreachable))?;
-                dbg!(&sock_addr);
-                let mut dst_sock = TcpStream::connect(&sock_addr)
-                    .await
-                    .or(Err(HttpError::TargetUnreachable))?;
-                let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
-                timed_our_stream.write_all(reply.as_bytes())
-                    .await
-                    .or(Err(HttpError::Internal))?;
-                util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
-                    .await
-                    .or(Err(HttpError::Tranciever))?;
-                //FIXME handle errors
-                //FIXME handle keepalive
-                break;
             }
             _ => return Err(HttpError::HeaderInvalid)
         }

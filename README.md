@@ -4,7 +4,7 @@ Dumb Proxy
 Simple proxy server that suppports next formats:
 - socks4
 - socks5
-- http (only GET, POST and CONNECT are supported)
+- http
 - tcp (TCP port mappper)
 
  ## License

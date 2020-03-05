@@ -6,10 +6,10 @@ use super::{
 use nom::{
     bytes::complete::{is_not, tag, take_until},
     character::complete::{alpha1, digit1, one_of, space1},
-    combinator::{opt, recognize, complete},
+    combinator::{complete, opt, recognize},
     multi::many0,
     sequence::tuple,
-    IResult,
+    IResult, branch::alt,
 };
 fn token(input: &str) -> IResult<&str, &str> {
     is_not("\x1f\x7f()<>@,;:\\\"/[]?={} \t")(input)
@@ -37,9 +37,23 @@ pub fn headers(input: &str) -> IResult<&str, Headers> {
     Ok((input, headers))
 }
 
+fn method(input: &str) -> IResult<&str, &str> {
+    alt((
+        tag("GET"),
+        tag("HEAD"),
+        tag("POST"),
+        tag("PUT"),
+        tag("DELETE"),
+        tag("TRACE"),
+        tag("OPTIONS"),
+        tag("CONNECT"),
+        tag("PATCH"),
+    ))(input)
+}
+
 fn request_first_line(input: &str) -> IResult<&str, (&str, &str, &str)> {
     let (input, (method, _space0, url, _space1, _http, http_version)) = tuple((
-        alpha1,
+        method,
         space1,
         take_until(" "),
         space1,
@@ -103,12 +117,15 @@ pub fn url(input: &str) -> IResult<&str, Url> {
         opt(digit1),
         is_not(" "),
     )))(input)?;
-    Ok((input, Url {
-        protocol: protocol.to_string(),
-        host: domain.to_string(),
-        port: port.map_or(80, |v| v.parse().unwrap()),
-        path: path.to_string()
-    }))
+    Ok((
+        input,
+        Url {
+            protocol: protocol.to_string(),
+            host: domain.to_string(),
+            port: port.map_or(80, |v| v.parse().unwrap()),
+            path: path.to_string(),
+        },
+    ))
 }
 
 #[cfg(test)]

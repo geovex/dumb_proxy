@@ -142,50 +142,7 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 //FIXME handle keepalive
                 break;
             }
-            "GET" => {
-                let (_rest, url) = parser::url(request.url.as_str())
-                    .or(Err(HttpError::HeaderInvalid))?;
-                let to_resolve = format!("{}:{}", url.host, url.port);
-                let mut dst = connection_pool
-                    .connect_or_reuse(to_resolve)
-                    .await
-                    .or(Err(HttpError::TargetUnreachable))?;
-                //modify request
-                let mut new_request = request.clone();
-                new_request.url = url.path;
-                //send request
-                dst.write_all(new_request.to_string().as_bytes())
-                    .await
-                    .or(Err(HttpError::Internal))?;
-                //check response
-                let response = read_header(&mut *dst).await?;
-                let (_input, response) =
-                    parser::response(response.as_str()).or(Err(HttpError::HeaderInvalid))?;
-                dbg!(&response);
-                timed_our_stream.write_all(response.to_string().as_bytes())
-                    .await
-                    .or(Err(HttpError::Internal))?;
-                //update timeout values
-                if let Some(timeout) = response.headers.keep_alive_value() {
-                    timed_our_stream.set_read_timeout(Some(Duration::from_secs(timeout.timeout + TIMEOUT_TOLERANCE_SECS)))
-                } else {
-                    timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
-                }
-                if response.has_body(&request) {
-                    //check response format (contet-length or chunked)
-                    if let Some(length) = response.headers.content_length() {
-                        limited_transceiver(&mut timed_our_stream, &mut *dst, length).await?;
-                    } else if response.headers.is_chuncked() {
-                        chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
-                    }
-                }
-                if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
-                    break 'main;
-                } else {
-                    dbg!(response.headers.keep_alive_value());
-                }
-            }
-            "POST" => {
+            _other_methods => {
                 let (_rest, url) = parser::url(request.url.as_str())
                     .or(Err(HttpError::HeaderInvalid))?;
                 let to_resolve = format!("{}:{}", url.host, url.port);
@@ -200,11 +157,13 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 dst.write_all(new_request.to_string().as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
-                // check request format (content-length or chunked)
-                if let Some(length) = request.headers.content_length() {
-                    limited_transceiver(&mut *dst, &mut timed_our_stream, length).await?;
-                } else if request.headers.is_chuncked() {
-                    chunked_transceiver(&mut *dst, &mut timed_our_stream).await?;
+                if request.has_body() {
+                    // check request format (content-length or chunked)
+                    if let Some(length) = request.headers.content_length() {
+                        limited_transceiver(&mut *dst, &mut timed_our_stream, length).await?;
+                    } else if request.headers.is_chuncked() {
+                        chunked_transceiver(&mut *dst, &mut timed_our_stream).await?;
+                    }
                 }
                 //process response
                 let response_header = read_header(&mut *dst).await?;
@@ -232,7 +191,6 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                     break 'main;
                 }
             }
-            _ => return Err(HttpError::HeaderInvalid)
         }
     }
     //println!("{}", request);

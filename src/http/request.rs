@@ -29,9 +29,9 @@ impl Request {
         )
     }
 
-    // pub fn has_body(&self) -> bool {
-    //     self.method == "POST"
-    // }
+    pub fn has_body(&self) -> bool {
+        self.method == "POST"
+    }
 }
 
 impl fmt::Debug for Request {

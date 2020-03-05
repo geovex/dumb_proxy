@@ -11,7 +11,7 @@ impl super::headers::Headers {
             false
         }
     }
-    pub fn content_length(&self) -> Option<u128> {
+    pub fn content_length(&self) -> Option<usize> {
         let cl = self
             .combined_value("Content-Length")
             .unwrap_or(String::new());

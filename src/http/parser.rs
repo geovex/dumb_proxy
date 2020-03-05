@@ -4,12 +4,13 @@ use super::{
     response::Response,
 };
 use nom::{
-    bytes::complete::{is_not, tag, take_until},
+    branch::alt,
+    bytes::complete::{is_a, is_not, tag, take_until},
     character::complete::{digit1, one_of, space1},
-    combinator::{opt, recognize, all_consuming},
+    combinator::{all_consuming, opt, recognize},
     multi::many0,
     sequence::tuple,
-    IResult, branch::alt,
+    IResult,
 };
 fn token(input: &str) -> IResult<&str, &str> {
     is_not("\x1f\x7f()<>@,;:\\\"/[]?={} \t")(input)
@@ -128,6 +129,17 @@ pub fn url(input: &str) -> IResult<&str, Url> {
     ))
 }
 
+/// parse line for chuncked encoding
+/// returns `(size, extensions_string)` pair
+pub fn chunk_line(input: &str) -> IResult<&str, (usize, &str)> {
+    let (input, (size, extensions_string)) = all_consuming(tuple((
+        is_a("0123456789abcdefABCDEF"),
+        opt(recognize(tuple((tag(";"), is_not("\r\n"))))),
+    )))(input)?;
+    let size = usize::from_str_radix(size, 16).unwrap();
+    Ok((input, (size, extensions_string.unwrap_or(""))))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -197,6 +209,29 @@ mod test {
         assert_eq!(r.status, 200);
         assert_eq!(r.status_phrase, "OK");
         assert_eq!(r.headers.combined_value("header0").unwrap(), "value0")
+    }
+    #[test]
+    fn chuncked_line_basic() {
+        let line = "aAfA12";
+        let (rest, (size, ext)) = chunk_line(line).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(size, 0xaafa12);
+        assert_eq!(ext, "");
+    }
+    #[test]
+    fn chuncked_line_with_ext() {
+        let line = "124a; test";
+        let (rest, (size, ext)) = chunk_line(line).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(size, 0x124a);
+        assert_eq!(ext, "; test");
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_line_invalid() {
+        let line = "1237 ; test";
+        chunk_line(line).unwrap();
     }
     #[test]
     fn url_no_port() {

@@ -22,7 +22,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 120;
 const TIMEOUT_TOLERANCE_SECS: u64 = 10;
 type HttpResult<T> = Result<T, HttpError>;
 
-async fn limited_transceiver<R, W>(src: &mut W, dst: &mut R, mut limit: u128) -> HttpResult<()>
+async fn limited_transceiver<R, W>(src: &mut W, dst: &mut R, mut limit: usize) -> HttpResult<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -40,7 +40,7 @@ where
         src.write_all(&mut dst_buf[..size])
             .await
             .or(Err(HttpError::Tranciever))?;
-        limit -= size as u128;
+        limit -= size;
     }
     Ok(())
 }
@@ -53,11 +53,7 @@ where
     loop {
         //read_chunk_size
         let length_str = read_line(dst).await.or(Err(HttpError::Tranciever))?;
-        if length_str.len() == 0 {
-            return Ok(());
-        }
-        let length =
-            u128::from_str_radix(length_str.as_str(), 16).or(Err(HttpError::Tranciever))?;
+        let (_rest, (length, _ext)) = parser::chunk_line(length_str.as_str()).or(Err(HttpError::Tranciever))?;
         if length == 0 {
             src.write_all(b"0\r\n\r\n")
                 .await

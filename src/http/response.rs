@@ -35,10 +35,10 @@ impl Response {
     }
 
     pub fn has_body(&self, request: &Request) -> bool {
-        request.method == "HEAD"
+        !(request.method == "HEAD"
             || { self.status >= 100 } && (self.status < 200)
             || self.status == 204
-            || self.status == 304
+            || self.status == 304)
     }
 }
 

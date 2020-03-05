@@ -5,7 +5,7 @@ use super::{
 };
 use nom::{
     bytes::complete::{is_not, tag, take_until},
-    character::complete::{alpha1, digit1, one_of, space1},
+    character::complete::{digit1, one_of, space1},
     combinator::{complete, opt, recognize},
     multi::many0,
     sequence::tuple,

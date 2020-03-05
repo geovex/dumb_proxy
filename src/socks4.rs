@@ -27,14 +27,12 @@ async fn socks4_parser(mut sock: TcpStream) -> Result<()> {
     };
     //parse header
     if header[0..2] != [4, 1] {
-        eprintln!("wrong socks command");
         sock.write_all(&BAD_REPLY).await.ok();
         return Err(io::Error::new(io::ErrorKind::InvalidData, "wrong header"))
     }; //bad socks command
     let port = ((header[2] as u16) << 8) + header[3] as u16;
     let addr = [header[4], header[5], header[6], header[7]];
     let dst_addr = SocketAddr::new(addr.into(), port);
-    dbg!(dst_addr);
     let dst = TcpStream::connect(&dst_addr).await;
     if dst.is_ok() {
         sock.write_all(&GOOD_REPLY).await?;
@@ -45,7 +43,6 @@ async fn socks4_parser(mut sock: TcpStream) -> Result<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
 pub async fn socks4(src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {

@@ -27,7 +27,6 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
         sock.write_all(&[0x5, 0xff]).await.ok();
         return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid auth"));
     }
-    dbg!(auth);
     //successful auth
     sock.write_all(&[0x5, 0x0]).await?;
     //client request
@@ -55,7 +54,6 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
             let mut domain = vec![0u8; len];
             sock.read_exact(domain.as_mut_slice()).await?;
             let domain = std::str::from_utf8(domain.as_slice()).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "domain parse error"))?;
-            dbg!(&domain);
             let domain: String = domain.chars().filter(|x| *x != ':').collect(); //possible : injection
             let domain = format!("{}:10", domain); 
             util::resolve_sockaddr(domain).await?.ip()
@@ -69,7 +67,6 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid request"));
         }
     };
-    dbg!(&ipaddr);
     let port = sock.read_u16().await?;
     let mut dest = TcpStream::connect(&SocketAddr::new(ipaddr, port)).await?;
     let dst_local_addr = dest.local_addr()?;
@@ -95,8 +92,6 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     Ok(())
 }
 
-
-#[allow(dead_code)]
 pub async fn socks5(src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {

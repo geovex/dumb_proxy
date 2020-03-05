@@ -193,7 +193,6 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
             }
         }
     }
-    //println!("{}", request);
     Ok(())
 }
 

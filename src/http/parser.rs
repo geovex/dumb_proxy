@@ -6,7 +6,7 @@ use super::{
 use nom::{
     bytes::complete::{is_not, tag, take_until},
     character::complete::{digit1, one_of, space1},
-    combinator::{complete, opt, recognize},
+    combinator::{opt, recognize, all_consuming},
     multi::many0,
     sequence::tuple,
     IResult, branch::alt,
@@ -109,7 +109,7 @@ pub fn response(input: &str) -> IResult<&str, Response> {
 }
 
 pub fn url(input: &str) -> IResult<&str, Url> {
-    let (input, (protocol, _, domain, _, port, path)) = complete(tuple((
+    let (input, (protocol, _, domain, _, port, path)) = all_consuming(tuple((
         is_not(":"),
         tag("://"),
         is_not(":/"),

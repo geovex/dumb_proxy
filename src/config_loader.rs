@@ -1,10 +1,10 @@
 use config;
-use serde_derive::{Deserialize};
+use serde_derive::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Deserialize, Debug, Clone, Default)]
 #[serde(default)]
-pub struct Config{
+pub struct Config {
     pub http: HashMap<String, HttpConfig>,
     pub socks4: HashMap<String, Socks4Config>,
     pub socks5: HashMap<String, Socks5Config>,
@@ -34,6 +34,24 @@ pub struct TcpPmConfig {
 
 pub fn load_config<P: AsRef<str>>(path: P) -> Config {
     let mut settings = config::Config::default();
-    settings.merge(config::File::with_name(path.as_ref())).unwrap();
+    settings
+        .merge(config::File::with_name(path.as_ref()))
+        .unwrap();
+    settings.try_into().unwrap()
+}
+
+const DEFAULT_CONFIG: &str = "
+[http.a]
+port = 3128
+";
+
+pub fn load_config_default() -> Config {
+    let mut settings = config::Config::default();
+    settings
+        .merge(config::File::from_str(
+            DEFAULT_CONFIG,
+            config::FileFormat::Toml,
+        ))
+        .unwrap();
     settings.try_into().unwrap()
 }

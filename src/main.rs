@@ -14,9 +14,15 @@ mod socks5;
 mod http;
 mod config_loader;
 mod config_spawner;
+use std::env;
 
 #[tokio::main]
 async fn main() {
-    let c = config_loader::load_config("config/default.toml");
+    let c = if env::args().len() > 1 {
+        config_loader::load_config(env::args().nth(2).unwrap())
+    } else {
+        println!("using default configuration");
+        config_loader::load_config_default()
+    };
     config_spawner::spawn(c).await;
 }

@@ -1,9 +1,8 @@
 use super::util;
-use std::{time::Duration, io};
+use std::{time::Duration};
 use tokio;
-use tokio::io::Result as IoResult;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::{net::{TcpListener, TcpStream}};
+use tokio::net::{TcpListener, TcpStream};
 use tokio_io_timeout::TimeoutStream;
 
 pub mod errors;
@@ -18,6 +17,7 @@ mod response;
 
 const INITIAL_HEADER_CAPACITY: usize = 512;
 const MAX_HEADER_HEADER_CAPACITY: usize = 64 * 1024;
+const MAX_LINE_SIZE: usize = 1024;
 const DEFAULT_TIMEOUT_SECS: u64 = 120;
 const TIMEOUT_TOLERANCE_SECS: u64 = 10;
 type HttpResult<T> = Result<T, HttpError>;
@@ -87,22 +87,21 @@ where
     }
     Ok(String::from_utf8(header).or(Err(HttpError::HeaderNotUtf8))?)
 }
-async fn read_line<R>(sock: &mut R) -> IoResult<String>
+async fn read_line<R>(sock: &mut R) -> HttpResult<String>
 where
     R: AsyncRead + Unpin,
 {
     let mut result = Vec::new();
     loop {
-        result.push(sock.read_u8().await?);
-        if result.len() > 2 && result.ends_with(b"\r\n") {
+        result.push(sock.read_u8().await.or(Err(HttpError::Tranciever))?);
+        if result.ends_with(b"\r\n") {
             break;
+        } else if result.len() > MAX_LINE_SIZE {
+            return Err(HttpError::Tranciever);
         }
     }
     result.resize(result.len() - 2, 0);
-    Ok(String::from_utf8(result).or(Err(io::Error::new(
-        io::ErrorKind::InvalidData,
-        "bad utf8 line",
-    )))?)
+    Ok(String::from_utf8(result).or(Err(HttpError::Tranciever))?)
 }
 
 async fn http_parser(sock: TcpStream) -> HttpResult<()> {

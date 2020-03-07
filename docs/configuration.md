@@ -19,7 +19,7 @@ Each engine has a set of options:
 ## tcppm
 
 * port: port number to listen for incoming connections
-* target: in _host:port_ specifies the target to forward the
+* target: in _ip:port_ specifies the target to forward the
           connection
 
 ## socks4, socks5, http
@@ -37,5 +37,5 @@ port = 3128
 #...and one tcp forwarder
 [tcppm.somename]
 port = 65000
-target = "localhost:3128"
+target = "127.0.0.1:3128"
 ```

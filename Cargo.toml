@@ -8,7 +8,7 @@ edition = "2018"
 tokio = {version = "0.2", features = ["full"] }
 tokio-io-timeout = {version = "0.4"}
 futures = "0.3"
-config = {version = "0.10", features = ["toml", "yaml"]}
+config = {version = "0.10", features = ["toml"]}
 serde = "1.0"
 serde_derive = "1.0"
 nom = "5.1"

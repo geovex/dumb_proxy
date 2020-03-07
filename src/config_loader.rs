@@ -35,7 +35,7 @@ pub struct TcpPmConfig {
 pub fn load_config<P: AsRef<str>>(path: P) -> Config {
     let mut settings = config::Config::default();
     settings
-        .merge(config::File::with_name(path.as_ref()))
+        .merge(config::File::new(path.as_ref(), config::FileFormat::Toml))
         .unwrap();
     settings.try_into().unwrap()
 }

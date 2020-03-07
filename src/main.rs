@@ -19,7 +19,7 @@ use std::env;
 #[tokio::main]
 async fn main() {
     let c = if env::args().len() > 1 {
-        config_loader::load_config(env::args().nth(2).unwrap())
+        config_loader::load_config(env::args().nth(1).unwrap())
     } else {
         println!("using default configuration");
         config_loader::load_config_default()

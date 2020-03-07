@@ -1,6 +1,8 @@
-use config;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
+use toml;
 
 #[derive(Deserialize, Debug, Clone, Default)]
 #[serde(default)]
@@ -33,25 +35,15 @@ pub struct TcpPmConfig {
 }
 
 pub fn load_config<P: AsRef<str>>(path: P) -> Config {
-    let mut settings = config::Config::default();
-    settings
-        .merge(config::File::new(path.as_ref(), config::FileFormat::Toml))
-        .unwrap();
-    settings.try_into().unwrap()
+    let mut buffer = String::new();
+    File::open(path.as_ref()).unwrap().read_to_string(&mut buffer).unwrap();
+    toml::from_str(&buffer).unwrap()
 }
 
-const DEFAULT_CONFIG: &str = "
-[http.a]
-port = 3128
-";
-
 pub fn load_config_default() -> Config {
-    let mut settings = config::Config::default();
-    settings
-        .merge(config::File::from_str(
-            DEFAULT_CONFIG,
-            config::FileFormat::Toml,
-        ))
-        .unwrap();
-    settings.try_into().unwrap()
+    let t = toml::toml! {
+        [http.a]
+        port = 3128
+    };
+    t.try_into().unwrap()
 }

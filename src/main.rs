@@ -1,7 +1,7 @@
 extern crate tokio;
 extern crate tokio_io_timeout;
 extern crate futures;
-extern crate config;
+extern crate toml;
 extern crate serde;
 extern crate serde_derive;
 extern crate nom;

@@ -140,6 +140,9 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
             _other_methods => {
                 let (_rest, url) = parser::url(request.url.as_str())
                     .or(Err(HttpError::HeaderInvalid))?;
+                if url.protocol != "http" {
+                    return Err(HttpError::HeaderInvalid)
+                }
                 let to_resolve = format!("{}:{}", url.host, url.port);
                 let mut dst = connection_pool
                     .connect_or_reuse(to_resolve)

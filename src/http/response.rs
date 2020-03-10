@@ -10,16 +10,20 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn new(
-        http_version: String,
+    pub fn new<S1, S2>(
+        http_version: S1,
         status: u16,
-        status_phrase: String,
+        status_phrase: S2,
         headers: Headers,
-    ) -> Response {
+    ) -> Response
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
         Response {
-            http_version,
+            http_version: http_version.as_ref().to_string(),
             status,
-            status_phrase,
+            status_phrase: status_phrase.as_ref().to_string(),
             headers,
         }
     }

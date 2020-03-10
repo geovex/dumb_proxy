@@ -1,5 +1,5 @@
 use super::util;
-use std::{time::Duration};
+use std::time::Duration;
 use tokio;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -7,6 +7,8 @@ use tokio_io_timeout::TimeoutStream;
 
 pub mod errors;
 use errors::HttpError;
+use response::Response;
+use headers::Headers;
 mod connection_pool;
 mod header_value_parser;
 mod headers;
@@ -53,7 +55,8 @@ where
     loop {
         //read_chunk_size
         let length_str = read_line(dst).await.or(Err(HttpError::Tranciever))?;
-        let (_rest, (length, _ext)) = parser::chunk_line(length_str.as_str()).or(Err(HttpError::Tranciever))?;
+        let (_rest, (length, _ext)) =
+            parser::chunk_line(length_str.as_str()).or(Err(HttpError::Tranciever))?;
         if length == 0 {
             src.write_all(b"0\r\n\r\n")
                 .await
@@ -77,9 +80,7 @@ where
 {
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
     while !(header.ends_with(b"\r\n\r\n")) {
-        let byte = sock.read_u8()
-            .await
-            .or(Err(HttpError::HeaderIncomplete))?;
+        let byte = sock.read_u8().await.or(Err(HttpError::HeaderIncomplete))?;
         header.push(byte);
         if header.len() > MAX_HEADER_HEADER_CAPACITY {
             return Err(HttpError::HeaderToBig);
@@ -104,6 +105,26 @@ where
     Ok(String::from_utf8(result).or(Err(HttpError::Tranciever))?)
 }
 
+const ERROR_400: &str = std::include_str!("error_pages/400.html");
+const ERROR_502: &str = std::include_str!("error_pages/502.html");
+
+async fn return_error_page<W, S>(src: &mut W, mut response: Response, body: S) -> HttpResult<()>
+where
+    W: AsyncWrite + Unpin,
+    S: AsRef<str>,
+{
+    let bytes = body.as_ref().as_bytes();
+    response.headers.insert_header("ContentLength", bytes.len().to_string());
+    response.headers.insert_header("Content-Type", "text/html");
+    src.write_all(response.to_string().as_bytes())
+        .await
+        .or(Err(HttpError::Internal))?;
+    src.write_all(bytes)
+        .await
+        .or(Err(HttpError::Internal))?;
+    Ok(())
+}
+
 async fn http_parser(sock: TcpStream) -> HttpResult<()> {
     //read header
     sock.set_nodelay(true).or(Err(HttpError::Internal))?;
@@ -112,8 +133,14 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
     timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
     'main: loop {
         let header = read_header(&mut timed_our_stream).await?;
-        let (_input, request) =
-            parser::request(header.as_str()).or(Err(HttpError::HeaderInvalid))?;
+        let request = match parser::request(header.as_str()) {
+            Ok((_rest, request)) => request,
+            Err(_) => {
+                let response = Response::new("1.1", 400, "invalid header", Headers::new());
+                return_error_page(&mut timed_our_stream, response, ERROR_400).await?;
+                return Err(HttpError::HeaderInvalid)
+            }
+        };
         dbg!(&request);
         //analyze request
         match request.method.as_str() {
@@ -127,7 +154,8 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                     .await
                     .or(Err(HttpError::TargetUnreachable))?;
                 let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
-                timed_our_stream.write_all(reply.as_bytes())
+                timed_our_stream
+                    .write_all(reply.as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
                 util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
@@ -138,16 +166,24 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 break;
             }
             _other_methods => {
-                let (_rest, url) = parser::url(request.url.as_str())
-                    .or(Err(HttpError::HeaderInvalid))?;
+                let (_rest, url) =
+                    parser::url(request.url.as_str()).or(Err(HttpError::HeaderInvalid))?;
                 if url.protocol != "http" {
-                    return Err(HttpError::HeaderInvalid)
+                    return Err(HttpError::HeaderInvalid);
                 }
                 let to_resolve = format!("{}:{}", url.host, url.port);
-                let mut dst = connection_pool
-                    .connect_or_reuse(to_resolve)
-                    .await
-                    .or(Err(HttpError::TargetUnreachable))?;
+                // let mut dst = connection_pool
+                //     .connect_or_reuse(to_resolve)
+                //     .await
+                //     .or(Err(HttpError::TargetUnreachable))?;
+                let mut dst = match connection_pool.connect_or_reuse(to_resolve).await {
+                    Ok(sock) => sock,
+                    Err(_) => {
+                        let response = Response::new(request.http_version, 502, "connection failed", Headers::new());
+                        return_error_page(&mut timed_our_stream, response, ERROR_502).await?;
+                        return Err(HttpError::TargetUnreachable)
+                    }
+                };
                 //modify request
                 let mut new_request = request.clone();
                 new_request.url = url.path;
@@ -168,14 +204,18 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 let (_input, response) =
                     parser::response(response_header.as_str()).or(Err(HttpError::HeaderInvalid))?;
                 dbg!(&response);
-                timed_our_stream.write_all(response.to_string().as_bytes())
+                timed_our_stream
+                    .write_all(response.to_string().as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
                 //update timeout values
                 if let Some(timeout) = response.headers.keep_alive_value() {
-                    timed_our_stream.set_read_timeout(Some(Duration::from_secs(timeout.timeout + TIMEOUT_TOLERANCE_SECS)))
+                    timed_our_stream.set_read_timeout(Some(Duration::from_secs(
+                        timeout.timeout + TIMEOUT_TOLERANCE_SECS,
+                    )))
                 } else {
-                    timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+                    timed_our_stream
+                        .set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
                 }
                 if response.has_body(&request) {
                     //check response format (contet-length or chunked)

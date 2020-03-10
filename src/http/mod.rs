@@ -114,7 +114,7 @@ where
     S: AsRef<str>,
 {
     let bytes = body.as_ref().as_bytes();
-    response.headers.insert_header("ContentLength", bytes.len().to_string());
+    response.headers.insert_header("Content-Length", bytes.len().to_string());
     response.headers.insert_header("Content-Type", "text/html");
     src.write_all(response.to_string().as_bytes())
         .await

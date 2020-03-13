@@ -5,6 +5,7 @@ authors = ["Heorhi Valakhanovich <valahanovich@tut.by>"]
 edition = "2018"
 
 [dependencies]
+chrono = "0.4"
 tokio = {version = "0.2", features = ["full"] }
 tokio-io-timeout = {version = "0.4"}
 futures = "0.3"

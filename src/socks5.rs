@@ -3,6 +3,7 @@ use tokio::io::Result;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use super::util;
+use crate::logger;
 
 use std::net::{SocketAddr, IpAddr};
 
@@ -23,7 +24,7 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     let mut auth = vec![0u8; nauth as usize];
     sock.read_exact(auth.as_mut_slice()).await?;
     if !auth.contains(&0u8) {
-         //only support no auth
+        //only support no auth
         sock.write_all(&[0x5, 0xff]).await.ok();
         return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid auth"));
     }
@@ -34,8 +35,8 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     if 0x01 != sock.read_u8().await? { //command
         let reply = [
             0x5u8, //VER
-            0x07, //invalid command
-            0, //RSV reserved
+            0x07,  //invalid command
+            0,     //RSV reserved
             0x1, 0x0, 0x0, 0x0, 0x0, //zeroed ipv4
             0x0, 0x0]; //seroed port
         sock.write_all(&reply).await.ok();
@@ -55,7 +56,7 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
             sock.read_exact(domain.as_mut_slice()).await?;
             let domain = std::str::from_utf8(domain.as_slice()).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "domain parse error"))?;
             let domain: String = domain.chars().filter(|x| *x != ':').collect(); //possible : injection
-            let domain = format!("{}:10", domain); 
+            let domain = format!("{}:10", domain);
             util::resolve_sockaddr(domain).await?.ip()
         },
         4 => {//ipv6
@@ -72,14 +73,14 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
     let dst_local_addr = dest.local_addr()?;
     sock.write_all(&[0x5, 0x0, 0x0]).await?;
     let reply_addr = match dst_local_addr {
-        SocketAddr::V4(a) => { 
+        SocketAddr::V4(a) => {
             let mut result = vec![1];
             result.extend_from_slice(&a.ip().octets());
             result.push((a.port() >> 8) as u8);
             result.push(a.port() as u8);
             result
         },
-        SocketAddr::V6(a) => { 
+        SocketAddr::V6(a) => {
             let mut result = vec![4];
             result.extend_from_slice(&a.ip().octets());
             result.push((a.port() >> 8) as u8);
@@ -88,6 +89,11 @@ async fn socks5_parser(mut sock: TcpStream) -> Result<()> {
         },
     };
     sock.write_all(&reply_addr).await?;
+    logger::log(format!(
+        "socks5 {:?} -> {:?}",
+        sock.peer_addr().unwrap(),
+        dest.peer_addr().unwrap()
+    ));
     util::transceiver(&mut sock, &mut dest).await?;
     Ok(())
 }
@@ -96,6 +102,6 @@ pub async fn socks5(src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
-        tokio::spawn(async move {socks5_parser(sock).await.ok()});
+        tokio::spawn(async move { socks5_parser(sock).await.ok() });
     }
 }

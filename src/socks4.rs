@@ -3,6 +3,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncWriteExt, Result};
 use tokio::io;
 use super::util;
+use crate::logger;
 
 async fn socks4_parser(mut sock: TcpStream) -> Result<()> {
     const GOOD_REPLY: [u8; 8] = [
@@ -34,9 +35,14 @@ async fn socks4_parser(mut sock: TcpStream) -> Result<()> {
     let addr = [header[4], header[5], header[6], header[7]];
     let dst_addr = SocketAddr::new(addr.into(), port);
     let dst = TcpStream::connect(&dst_addr).await;
-    if dst.is_ok() {
+    if let Ok(mut dst) = dst {
         sock.write_all(&GOOD_REPLY).await?;
-        util::transceiver(&mut sock, &mut dst.unwrap()).await.ok();
+        logger::log(format!(
+            "socs4 {:?} -> {:?}",
+            sock.peer_addr().unwrap(),
+            dst.peer_addr().unwrap())
+        );
+        util::transceiver(&mut sock, &mut dst).await.ok();
     } else {
         sock.write_all(&BAD_REPLY).await.ok();
     };

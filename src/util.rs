@@ -1,3 +1,4 @@
+use crate::logger;
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio;
 use tokio::io;
@@ -35,7 +36,7 @@ pub async fn resolve_sockaddr<S: Into<String>>(addr_port: S) -> Result<SocketAdd
     match addrs {
         Ok(mut addr_list) => {Ok(addr_list.next().unwrap())},
         Err(err) => {
-            dbg!(err);
+            logger::log(format!("resolv error: {:?}", err));
             return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found")
         )}
     }

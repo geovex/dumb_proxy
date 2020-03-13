@@ -1,3 +1,4 @@
+extern crate chrono;
 extern crate tokio;
 extern crate tokio_io_timeout;
 extern crate futures;
@@ -8,6 +9,7 @@ extern crate nom;
 extern crate lru_cache;
 
 pub(crate) mod util;
+mod logger;
 mod tcppm;
 mod socks4;
 mod socks5;

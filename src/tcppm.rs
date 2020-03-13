@@ -1,6 +1,7 @@
+use super::util;
+use crate::logger;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
-use super::util;
 
 pub async fn tcppm(src_port: u16, target: SocketAddr) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
@@ -10,6 +11,11 @@ pub async fn tcppm(src_port: u16, target: SocketAddr) {
             if let Ok(mut dst) = TcpStream::connect(target).await {
                 src.set_nodelay(true).ok();
                 dst.set_nodelay(true).ok();
+                logger::log(format!(
+                    "tcppm {:?} -> {:?}",
+                    src.peer_addr().unwrap(),
+                    dst.peer_addr().unwrap()
+                ));
                 util::transceiver(&mut src, &mut dst).await.ok();
             }
         });

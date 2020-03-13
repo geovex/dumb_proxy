@@ -1,4 +1,5 @@
 use super::util;
+use crate::logger;
 use std::time::Duration;
 use tokio;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -7,8 +8,8 @@ use tokio_io_timeout::TimeoutStream;
 
 pub mod errors;
 use errors::HttpError;
-use response::Response;
 use headers::Headers;
+use response::Response;
 mod connection_pool;
 mod header_value_parser;
 mod headers;
@@ -126,6 +127,7 @@ where
 }
 
 async fn http_parser(sock: TcpStream) -> HttpResult<()> {
+    let src_ip = sock.peer_addr().unwrap();
     //read header
     sock.set_nodelay(true).or(Err(HttpError::Internal))?;
     let mut connection_pool = connection_pool::ConnectionPool::new();
@@ -141,7 +143,6 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 return Err(HttpError::HeaderInvalid)
             }
         };
-        dbg!(&request);
         //analyze request
         match request.method.as_str() {
             "CONNECT" => {
@@ -149,15 +150,16 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 let sock_addr = util::resolve_sockaddr(&request.url)
                     .await
                     .or(Err(HttpError::TargetUnreachable))?;
-                dbg!(&sock_addr);
                 let mut dst_sock = TcpStream::connect(&sock_addr)
                     .await
                     .or(Err(HttpError::TargetUnreachable))?;
+                let dst_ip = dst_sock.peer_addr().unwrap();
                 let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
                 timed_our_stream
                     .write_all(reply.as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
+                logger::log(format!("http CONECT {:?} -> {:?}", src_ip, dst_ip));
                 util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
                     .await
                     .or(Err(HttpError::Tranciever))?;
@@ -179,7 +181,12 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 let mut dst = match connection_pool.connect_or_reuse(to_resolve).await {
                     Ok(sock) => sock,
                     Err(_) => {
-                        let response = Response::new(request.http_version, 502, "connection failed", Headers::new());
+                        let response = Response::new(
+                            request.http_version,
+                            502,
+                            "connection failed",
+                            Headers::new(),
+                        );
                         return_error_page(&mut timed_our_stream, response, ERROR_502).await?;
                         return Err(HttpError::TargetUnreachable)
                     }
@@ -203,7 +210,6 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                 let response_header = read_header(&mut *dst).await?;
                 let (_input, response) =
                     parser::response(response_header.as_str()).or(Err(HttpError::HeaderInvalid))?;
-                dbg!(&response);
                 timed_our_stream
                     .write_all(response.to_string().as_bytes())
                     .await
@@ -217,6 +223,10 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                     timed_our_stream
                         .set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
                 }
+                logger::log(format!(
+                    "http {} {:?} -> {:?} {}",
+                    request.method, src_ip, request.url, response.status
+                ));
                 if response.has_body(&request) {
                     //check response format (contet-length or chunked)
                     if let Some(length) = response.headers.content_length() {

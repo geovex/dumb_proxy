@@ -41,3 +41,13 @@ pub async fn resolve_sockaddr<S: Into<String>>(addr_port: S) -> Result<SocketAdd
         )}
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    #[should_panic]
+    fn invalid_resolve() {
+        use std::net::ToSocketAddrs as _;
+        "127.0.0.1:80:70".to_socket_addrs().unwrap();
+    }
+}

@@ -85,7 +85,6 @@ async fn socks5_parser(mut sock: TcpStream) -> Socks5Result<()> {
     let sockaddr = match request.addr {
         RequestAddr::Ip(addr) => SocketAddr::new(addr, request.port),
         RequestAddr::Domain(domain) => {
-            let domain: String = domain.chars().filter(|c| *c != ':').collect();
             let domain = format!("{}:{}", domain, request.port);
             util::resolve_sockaddr(domain)
                 .await

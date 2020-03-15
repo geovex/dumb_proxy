@@ -17,6 +17,8 @@ pub enum Socks4Error {
 type Socks4Result<T> = Result<T, Socks4Error>;
 
 const MAX_ID_LENGTH: usize = 1000;
+
+#[derive(Debug)]
 pub struct Request {
     // VER 0x04
     pub cmd: u8,
@@ -33,7 +35,7 @@ where
         .await
         .or(Err(Socks4Error::HeaderInvalid))?;
     let mut id = Vec::with_capacity(10);
-    while id.ends_with(&[0]) && id.len() < MAX_ID_LENGTH {
+    while !id.ends_with(&[0]) && id.len() < MAX_ID_LENGTH {
         id.push(sock.read_u8().await.or(Err(Socks4Error::HeaderInvalid))?);
     }
     id.pop();
@@ -61,6 +63,10 @@ async fn socks4_parser(mut sock: TcpStream) -> Socks4Result<()> {
     ]; //DSTIP
     sock.set_nodelay(true).ok();
     let request = read_request(&mut sock).await?;
+    if request.cmd != 1 {
+        sock.write_all(&BAD_REPLY).await.ok();
+        return Err(Socks4Error::HeaderInvalid)
+    }
     let dst = TcpStream::connect(&request.dst).await;
     if let Ok(mut dst) = dst {
         sock.write_all(&GOOD_REPLY)

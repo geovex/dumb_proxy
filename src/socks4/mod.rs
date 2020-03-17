@@ -48,7 +48,7 @@ where
     })
 }
 
-async fn socks4_parser(mut sock: TcpStream) -> Socks4Result<()> {
+async fn socks4_parser(name: String, mut sock: TcpStream) -> Socks4Result<()> {
     const GOOD_REPLY: [u8; 8] = [
         0x00u8, //VN
         0x5a,   //Granted
@@ -73,7 +73,8 @@ async fn socks4_parser(mut sock: TcpStream) -> Socks4Result<()> {
             .await
             .or(Err(Socks4Error::Handshake))?;
         logger::log(format!(
-            "socs4 {:?} {} -> {:?}",
+            "socs4.{} {:?} {} -> {:?}",
+            name,
             sock.peer_addr().or(Err(Socks4Error::Handshake))?,
             request.id,
             dst.peer_addr().or(Err(Socks4Error::Handshake))?
@@ -87,10 +88,11 @@ async fn socks4_parser(mut sock: TcpStream) -> Socks4Result<()> {
     }
 }
 
-pub async fn socks4(src_port: u16) {
+pub async fn socks4(name: String, src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
-        tokio::spawn(async move { socks4_parser(sock).await.ok() });
+        let name_clone = name.clone();
+        tokio::spawn(async move { socks4_parser(name_clone, sock).await.ok() });
     }
 }

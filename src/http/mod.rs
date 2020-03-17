@@ -126,7 +126,7 @@ where
     Ok(())
 }
 
-async fn http_parser(sock: TcpStream) -> HttpResult<()> {
+async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
     let src_ip = sock.peer_addr().unwrap();
     //read header
     sock.set_nodelay(true).or(Err(HttpError::Internal))?;
@@ -224,8 +224,8 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
                         .set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
                 }
                 logger::log(format!(
-                    "http {} {:?} -> {:?} {}",
-                    request.method, src_ip, request.url, response.status
+                    "http.{} {} {:?} -> {:?} {}",
+                    name, request.method, src_ip, request.url, response.status
                 ));
                 if response.has_body(&request) {
                     //check response format (contet-length or chunked)
@@ -244,10 +244,11 @@ async fn http_parser(sock: TcpStream) -> HttpResult<()> {
     Ok(())
 }
 
-pub async fn http(src_port: u16) {
+pub async fn http(name: String, src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
-        tokio::spawn(async move { http_parser(sock).await });
+        let name_clone = name.clone();
+        tokio::spawn(async move { http_parser(name_clone, sock).await });
     }
 }

@@ -61,7 +61,7 @@ where
     }
 }
 
-async fn socks5_parser(mut sock: TcpStream) -> Socks5Result<()> {
+async fn socks5_parser(name: String, mut sock: TcpStream) -> Socks5Result<()> {
     use tokio::io::AsyncWriteExt;
     sock.set_nodelay(true).ok();
     let auth_requeest = parser_read(&mut sock, parser::parse_auth)
@@ -114,7 +114,8 @@ async fn socks5_parser(mut sock: TcpStream) -> Socks5Result<()> {
         .await
         .or(Err(Socks5Error::Handshake))?;
     logger::log(format!(
-        "socks5 {:?} -> {:?}",
+        "socks5.{} {:?} -> {:?}",
+        name,
         sock.peer_addr().unwrap(),
         dest.peer_addr().unwrap()
     ));
@@ -124,11 +125,12 @@ async fn socks5_parser(mut sock: TcpStream) -> Socks5Result<()> {
     Ok(())
 }
 
-pub async fn socks5(src_port: u16) {
+pub async fn socks5(name: String, src_port: u16) {
     let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
-        tokio::spawn(async move { socks5_parser(sock).await.ok() });
+        let name_clone = name.clone();
+        tokio::spawn(async move { socks5_parser(name_clone, sock).await.ok() });
     }
 }
 

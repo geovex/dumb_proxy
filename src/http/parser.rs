@@ -7,7 +7,7 @@ use nom::{
     branch::alt,
     bytes::complete::{is_a, is_not, tag, take_until},
     character::complete::{digit1, one_of, space1},
-    combinator::{all_consuming, opt, recognize},
+    combinator::{opt, recognize, all_consuming},
     multi::many0,
     sequence::tuple,
     IResult,
@@ -109,11 +109,20 @@ pub fn response(input: &str) -> IResult<&str, Response> {
     ))
 }
 
+fn domain(input: &str) -> IResult<&str, &str> {
+    let (rest, host) = alt((
+        recognize(tuple((tag("["), is_a("012345678abcdefABCDEF:"), tag("]")))),
+        is_not(":/")
+    ))(input)?;
+    Ok((rest, host))
+}
+
+
 pub fn url(input: &str) -> IResult<&str, Url> {
     let (input, (protocol, _, domain, _, port, path)) = all_consuming(tuple((
         is_not(":"),
         tag("://"),
-        is_not(":/"),
+        domain,
         opt(tag(":")),
         opt(digit1),
         is_not(" "),
@@ -252,5 +261,12 @@ mod test {
         assert_eq!(url.host, "example.net");
         assert_eq!(url.port, 8080);
         assert_eq!(url.path, "/path");
+    }
+    #[test]
+    fn url_ipv6() {
+        let line = "http://[::]/";
+        let (rest, url) = url(line).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(url.host, "[::]");
     }
 }

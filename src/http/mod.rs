@@ -159,7 +159,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                     .write_all(reply.as_bytes())
                     .await
                     .or(Err(HttpError::Internal))?;
-                logger::log(format!("http CONECT {:?} -> {:?}", src_ip, dst_ip));
+                logger::log(format!("http.{} CONECT {:?} -> {:?}", name, src_ip, dst_ip));
                 util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
                     .await
                     .or(Err(HttpError::Tranciever))?;

@@ -116,8 +116,8 @@ async fn socks5_parser(name: String, mut sock: TcpStream) -> Socks5Result<()> {
     logger::log(format!(
         "socks5.{} {:?} -> {:?}",
         name,
-        sock.peer_addr().unwrap(),
-        dest.peer_addr().unwrap()
+        sock.peer_addr().or(Err(Socks5Error::Handshake))?,
+        dest.peer_addr().or(Err(Socks5Error::Handshake))?
     ));
     util::transceiver(&mut sock, &mut dest)
         .await

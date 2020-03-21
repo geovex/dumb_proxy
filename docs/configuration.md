@@ -19,7 +19,7 @@ Each engine has a set of options:
 ## tcppm
 
 * port: port number to listen for incoming connections
-* target: in _ip:port_ specifies the target to forward the
+* target: in _host:port_ specifies the target to forward the
           connection
 
 ## socks4, socks5, http

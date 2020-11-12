@@ -245,7 +245,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
 }
 
 pub async fn http(name: String, src_port: u16) {
-    let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
+    let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();

@@ -1,12 +1,4 @@
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, is_not, tag},
-    character::complete::{multispace0, multispace1, none_of, one_of},
-    combinator::{recognize, rest},
-    multi::separated_list,
-    sequence::{delimited, separated_pair},
-    IResult,
-};
+use nom::{IResult, branch::alt, bytes::complete::{escaped, is_not, tag}, character::complete::{multispace0, multispace1, none_of, one_of}, combinator::{recognize, rest}, multi::separated_list0, sequence::{delimited, separated_pair}};
 use std::collections::BTreeMap;
 
 fn literal(input: &str) -> IResult<&str, &str> {
@@ -23,13 +15,13 @@ fn literal(input: &str) -> IResult<&str, &str> {
 fn spaced_item(input: &str) -> IResult<&str, &str> {
     delimited(
         multispace0,
-        recognize(separated_list(multispace1, literal)),
+        recognize(separated_list0(multispace1, literal)),
         multispace0,
     )(input)
 }
 
 pub fn value_list(input: &str) -> IResult<&str, Vec<&str>> {
-    separated_list(tag(","), spaced_item)(input)
+    separated_list0(tag(","), spaced_item)(input)
 }
 
 pub fn kv(input: &str) -> IResult<&str, BTreeMap<&str, &str>> {

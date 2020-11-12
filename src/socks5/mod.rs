@@ -48,7 +48,7 @@ where
             Ok((_, result)) => return Some(result),
             Err(Err::Incomplete(Needed::Size(size))) => {
                 let old_len = temp.len();
-                temp.resize(old_len + size, 0);
+                temp.resize(old_len + size.get(), 0);
                 stream.read_exact(&mut temp[old_len..]).await.ok()?;
             }
             Err(Err::Incomplete(Needed::Unknown)) => {
@@ -126,7 +126,7 @@ async fn socks5_parser(name: String, mut sock: TcpStream) -> Socks5Result<()> {
 }
 
 pub async fn socks5(name: String, src_port: u16) {
-    let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
+    let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();

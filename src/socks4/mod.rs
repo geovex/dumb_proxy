@@ -89,7 +89,7 @@ async fn socks4_parser(name: String, mut sock: TcpStream) -> Socks4Result<()> {
 }
 
 pub async fn socks4(name: String, src_port: u16) {
-    let mut listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
+    let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();

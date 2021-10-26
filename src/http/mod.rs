@@ -133,6 +133,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
     let mut connection_pool = connection_pool::ConnectionPool::new();
     let mut timed_our_stream = TimeoutStream::new(sock);
     timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
+    let mut timed_our_stream = Box::pin(timed_our_stream);
     'main: loop {
         let header = read_header(&mut timed_our_stream).await?;
         let request = match parser::request(header.as_str()) {
@@ -160,7 +161,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                     .await
                     .or(Err(HttpError::Internal))?;
                 logger::log(format!("http.{} CONECT {:?} -> {:?}", name, src_ip, dst_ip));
-                util::transceiver(&mut timed_our_stream.into_inner(), &mut dst_sock)
+                util::transceiver(&mut timed_our_stream, &mut dst_sock)
                     .await
                     .or(Err(HttpError::Tranciever))?;
                 //FIXME handle errors
@@ -188,7 +189,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                             Headers::new(),
                         );
                         return_error_page(&mut timed_our_stream, response, ERROR_502).await?;
-                        return Err(HttpError::TargetUnreachable)
+                        return Err(HttpError::TargetUnreachable);
                     }
                 };
                 //modify request
@@ -216,12 +217,15 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                     .or(Err(HttpError::Internal))?;
                 //update timeout values
                 if let Some(timeout) = response.headers.keep_alive_value() {
-                    timed_our_stream.set_read_timeout(Some(Duration::from_secs(
-                        timeout.timeout + TIMEOUT_TOLERANCE_SECS,
-                    )))
+                    timed_our_stream
+                        .as_mut()
+                        .set_read_timeout_pinned(Some(Duration::from_secs(
+                            timeout.timeout + TIMEOUT_TOLERANCE_SECS,
+                        )))
                 } else {
                     timed_our_stream
-                        .set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+                        .as_mut()
+                        .set_read_timeout_pinned(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
                 }
                 logger::log(format!(
                     "http.{} {} {:?} -> {:?} {}",

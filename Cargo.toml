@@ -6,13 +6,13 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4"
-tokio = {version = "0.3", features = ["full"] }
-tokio-io-timeout = {version = "0.5"}
+tokio = {version = "1.12.0", features = ["full"] }
+tokio-io-timeout = "1.1.1"
 futures = "0.3"
 toml = "0.5"
 serde = "1.0"
 serde_derive = "1.0"
-nom = "6.0"
+nom = "7.0"
 lru-cache = "0.1"
 
 [profile.release]

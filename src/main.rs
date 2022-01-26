@@ -7,6 +7,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate nom;
 extern crate lru_cache;
+extern crate socket2;
 
 pub(crate) mod util;
 mod logger;

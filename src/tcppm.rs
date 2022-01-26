@@ -3,7 +3,7 @@ use crate::logger;
 use tokio::net::{TcpListener, TcpStream};
 
 pub async fn tcppm(name: String, src_port: u16, target: String) {
-    let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
+    let listener = util::bind_listener(src_port).await;
     loop {
         let (mut src, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();

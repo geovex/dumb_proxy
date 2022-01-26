@@ -125,7 +125,7 @@ async fn socks5_parser(name: String, mut sock: TcpStream) -> Socks5Result<()> {
 }
 
 pub async fn socks5(name: String, src_port: u16) {
-    let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
+    let listener = util::bind_listener(src_port).await;
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();

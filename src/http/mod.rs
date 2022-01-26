@@ -255,7 +255,7 @@ async fn http_processor(name: String, sock: TcpStream) {
 }
 
 pub async fn http(name: String, src_port: u16) {
-    let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
+    let listener = util::bind_listener(src_port).await;
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();

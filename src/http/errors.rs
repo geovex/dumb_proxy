@@ -4,7 +4,6 @@ pub enum HttpError {
     HeaderIncomplete(String),
     HeaderNotUtf8,
     HeaderInvalid,
-    Resolve(String),
     TargetUnreachable(String),
     LimitedTranciever,
     ChunkTranciever,

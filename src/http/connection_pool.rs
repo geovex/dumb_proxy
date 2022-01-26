@@ -1,4 +1,3 @@
-use crate::util::resolve_sockaddr;
 use std::ops::{Deref, DerefMut};
 use std::sync::Mutex;
 use tokio::io::Result;
@@ -59,8 +58,7 @@ impl ConnectionPool {
         let sock = if let Some(sock) = temp {
             sock
         } else {
-            let sockaddr = resolve_sockaddr(domain_port.clone()).await?;
-            let sock = TcpStream::connect(sockaddr).await?;
+            let sock = TcpStream::connect(domain_port).await?;
             sock.set_nodelay(true)?;
             sock
         };

@@ -82,19 +82,18 @@ async fn socks5_parser(name: String, mut sock: TcpStream) -> Socks5Result<()> {
     sock.write_all(&[0x5, 0x0, 0x0])
         .await
         .or(Err(Socks5Error::Handshake))?;
-    let sockaddr = match request.addr {
-        RequestAddr::Ip(addr) => SocketAddr::new(addr, request.port),
+    let mut dest = match request.addr {
+        RequestAddr::Ip(addr) => TcpStream::connect(SocketAddr::new(addr, request.port))
+            .await
+            .or(Err(Socks5Error::TargetUnreachable))?,
         RequestAddr::Domain(domain) => {
             let domain = format!("{}:{}", domain, request.port);
-            util::resolve_sockaddr(domain)
+            TcpStream::connect(domain)
                 .await
                 .or(Err(Socks5Error::TargetUnreachable))?
         }
     };
-    let mut dest = TcpStream::connect(sockaddr)
-        .await
-        .or(Err(Socks5Error::TargetUnreachable))?;
-    let reply_addr = match sockaddr {
+    let reply_addr = match dest.peer_addr().or(Err(Socks5Error::InvalidRequest))? {
         SocketAddr::V4(a) => {
             let mut result = vec![1];
             result.extend_from_slice(&a.ip().octets());

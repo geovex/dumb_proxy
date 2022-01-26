@@ -148,10 +148,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
         match request.method.as_str() {
             "CONNECT" => {
                 request.headers.keep_alive_value();
-                let sock_addr = util::resolve_sockaddr(&request.url)
-                    .await
-                    .or(Err(HttpError::Resolve(request.url.clone())))?;
-                let mut dst_sock = TcpStream::connect(&sock_addr)
+                let mut dst_sock = TcpStream::connect(&request.url)
                     .await
                     .or(Err(HttpError::TargetUnreachable(request.url.clone())))?;
                 let dst_ip = dst_sock.peer_addr().unwrap();

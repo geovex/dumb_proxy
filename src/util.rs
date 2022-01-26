@@ -1,8 +1,5 @@
-use crate::logger;
-use std::net::{SocketAddr, ToSocketAddrs};
 use tokio;
-use tokio::io;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt, Result};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Result};
 
 pub async fn transceiver<S, D>(src: &mut S, dst: &mut D) -> Result<()>
 where
@@ -25,20 +22,6 @@ where
                 return Ok(());
             }
         }
-    }
-}
-
-pub async fn resolve_sockaddr<S: Into<String>>(addr_port: S) -> Result<SocketAddr> {
-    let string_addr_port = addr_port.into();
-    let addrs = tokio::task::spawn_blocking(move || {
-        string_addr_port.to_socket_addrs()
-    }).await?;
-    match addrs {
-        Ok(mut addr_list) => {Ok(addr_list.next().unwrap())},
-        Err(err) => {
-            logger::log(format!("resolv error: {:?}", err));
-            return Err(io::Error::new(io::ErrorKind::NotFound, "domain not found")
-        )}
     }
 }
 

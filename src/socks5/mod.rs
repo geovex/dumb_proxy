@@ -1,6 +1,6 @@
 use super::util;
 use crate::logger;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpStream;
 
 use nom::{Err, IResult, Needed};
 use std::net::{IpAddr, SocketAddr};

@@ -1,6 +1,6 @@
 use super::util;
 use crate::logger;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpStream;
 
 pub async fn tcppm(name: String, src_port: u16, target: String) {
     let listener = util::bind_listener(src_port).await;

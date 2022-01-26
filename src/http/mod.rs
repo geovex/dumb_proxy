@@ -3,7 +3,7 @@ use crate::logger;
 use std::time::Duration;
 use tokio;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpStream;
 use tokio_io_timeout::TimeoutStream;
 
 pub mod errors;

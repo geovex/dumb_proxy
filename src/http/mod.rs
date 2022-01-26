@@ -36,13 +36,13 @@ where
         let size = dst
             .read(&mut dst_buf[..limited_value])
             .await
-            .or(Err(HttpError::Tranciever))?;
+            .or(Err(HttpError::LimitedTranciever))?;
         if size == 0 {
             return Ok(());
         };
         src.write_all(&mut dst_buf[..size])
             .await
-            .or(Err(HttpError::Tranciever))?;
+            .or(Err(HttpError::LimitedTranciever))?;
         limit -= size;
     }
     Ok(())
@@ -55,22 +55,22 @@ where
 {
     loop {
         //read_chunk_size
-        let length_str = read_line(dst).await.or(Err(HttpError::Tranciever))?;
+        let length_str = read_line(dst).await?;
         let (_rest, (length, _ext)) =
-            parser::chunk_line(length_str.as_str()).or(Err(HttpError::Tranciever))?;
+            parser::chunk_line(length_str.as_str()).or(Err(HttpError::ChunkTranciever))?;
         if length == 0 {
             src.write_all(b"0\r\n\r\n")
                 .await
-                .or(Err(HttpError::Tranciever))?;
+                .or(Err(HttpError::ChunkTranciever))?;
             return Ok(());
         } else {
             src.write_all(length_str.as_bytes()).await.unwrap();
             src.write_all(b"\r\n")
                 .await
-                .or(Err(HttpError::Tranciever))?;
+                .or(Err(HttpError::ChunkTranciever))?;
             limited_transceiver(src, dst, length + 2)
                 .await
-                .or(Err(HttpError::Tranciever))?;
+                .or(Err(HttpError::ChunkTranciever))?;
         }
     }
 }
@@ -81,7 +81,7 @@ where
 {
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
     while !(header.ends_with(b"\r\n\r\n")) {
-        let byte = sock.read_u8().await.or(Err(HttpError::HeaderIncomplete))?;
+        let byte = sock.read_u8().await.or(Err(HttpError::HeaderIncomplete(format!("{:?}", header))))?;
         header.push(byte);
         if header.len() > MAX_HEADER_HEADER_CAPACITY {
             return Err(HttpError::HeaderToBig);
@@ -95,15 +95,15 @@ where
 {
     let mut result = Vec::new();
     loop {
-        result.push(sock.read_u8().await.or(Err(HttpError::Tranciever))?);
+        result.push(sock.read_u8().await.or(Err(HttpError::LimitedTranciever))?);
         if result.ends_with(b"\r\n") {
             break;
         } else if result.len() > MAX_LINE_SIZE {
-            return Err(HttpError::Tranciever);
+            return Err(HttpError::LimitedTranciever);
         }
     }
     result.resize(result.len() - 2, 0);
-    Ok(String::from_utf8(result).or(Err(HttpError::Tranciever))?)
+    Ok(String::from_utf8(result).or(Err(HttpError::LimitedTranciever))?)
 }
 
 const ERROR_400: &str = std::include_str!("error_pages/400.html");
@@ -150,10 +150,10 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                 request.headers.keep_alive_value();
                 let sock_addr = util::resolve_sockaddr(&request.url)
                     .await
-                    .or(Err(HttpError::TargetUnreachable))?;
+                    .or(Err(HttpError::Resolve(request.url.clone())))?;
                 let mut dst_sock = TcpStream::connect(&sock_addr)
                     .await
-                    .or(Err(HttpError::TargetUnreachable))?;
+                    .or(Err(HttpError::TargetUnreachable(request.url.clone())))?;
                 let dst_ip = dst_sock.peer_addr().unwrap();
                 let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
                 timed_our_stream
@@ -163,7 +163,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                 logger::log(format!("http.{} CONECT {:?} -> {:?}", name, src_ip, dst_ip));
                 util::transceiver(&mut timed_our_stream, &mut dst_sock)
                     .await
-                    .or(Err(HttpError::Tranciever))?;
+                    .or(Err(HttpError::LimitedTranciever))?;
                 //FIXME handle errors
                 //FIXME handle keepalive
                 break;
@@ -179,7 +179,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                 //     .connect_or_reuse(to_resolve)
                 //     .await
                 //     .or(Err(HttpError::TargetUnreachable))?;
-                let mut dst = match connection_pool.connect_or_reuse(to_resolve).await {
+                let mut dst = match connection_pool.connect_or_reuse(&to_resolve).await {
                     Ok(sock) => sock,
                     Err(_) => {
                         let response = Response::new(
@@ -189,7 +189,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                             Headers::new(),
                         );
                         return_error_page(&mut timed_our_stream, response, ERROR_502).await?;
-                        return Err(HttpError::TargetUnreachable);
+                        return Err(HttpError::TargetUnreachable(to_resolve));
                     }
                 };
                 //modify request
@@ -248,11 +248,20 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
     Ok(())
 }
 
+async fn http_processor(name: String, sock: TcpStream) {
+    match http_parser(name, sock).await {
+        Ok(_) => (),
+        Err(e) => {
+            logger::log(format!("client error: {:?}", e)); 
+        },
+    }
+}
+
 pub async fn http(name: String, src_port: u16) {
     let listener = TcpListener::bind(("0.0.0.0", src_port)).await.unwrap();
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let name_clone = name.clone();
-        tokio::spawn(async move { http_parser(name_clone, sock).await });
+        tokio::spawn(async move { http_processor(name_clone, sock).await });
     }
 }

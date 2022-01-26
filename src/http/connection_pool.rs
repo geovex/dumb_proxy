@@ -53,9 +53,9 @@ impl ConnectionPool {
     }
     pub async fn connect_or_reuse<'cp>(
         &'cp mut self,
-        domain_port: String,
+        domain_port: &String,
     ) -> Result<SockRef<'cp>> {
-        let temp = self.connections.lock().unwrap().remove(&domain_port);
+        let temp = self.connections.lock().unwrap().remove(domain_port);
         let sock = if let Some(sock) = temp {
             sock
         } else {
@@ -66,7 +66,7 @@ impl ConnectionPool {
         };
         Ok(SockRef {
             sock: Some(sock),
-            domain_port,
+            domain_port: domain_port.clone(),
             pool: self,
         })
     }

@@ -1,11 +1,19 @@
 #[derive(Debug)]
 pub enum HttpError {
     HeaderToBig,
-    HeaderIncomplete(String),
+    HeaderIncomplete,
     HeaderNotUtf8,
+    HeaderParseError,
     HeaderInvalid,
+    ResponceHeaderParseError,
+    UrlProtocolInvalid,
     TargetUnreachable(String),
     LimitedTranciever,
+    LimitedTrancieverRead,
+    LimitedTrancieverWrite,
+    LineRead,
+    LineTooLong,
+    LineNotUtf8,
     ChunkTranciever,
     Internal
 }

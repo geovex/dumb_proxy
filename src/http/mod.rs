@@ -36,13 +36,13 @@ where
         let size = dst
             .read(&mut dst_buf[..limited_value])
             .await
-            .or(Err(HttpError::LimitedTranciever))?;
+            .or(Err(HttpError::LimitedTrancieverRead))?;
         if size == 0 {
             return Ok(());
         };
         src.write_all(&mut dst_buf[..size])
             .await
-            .or(Err(HttpError::LimitedTranciever))?;
+            .or(Err(HttpError::LimitedTrancieverWrite))?;
         limit -= size;
     }
     Ok(())
@@ -82,7 +82,7 @@ where
 {
     let mut header = Vec::with_capacity(INITIAL_HEADER_CAPACITY);
     while !(header.ends_with(b"\r\n\r\n")) {
-        let byte = sock.read_u8().await.or(Err(HttpError::HeaderIncomplete(format!("{:?}", header))))?;
+        let byte = sock.read_u8().await.or(Err(HttpError::HeaderIncomplete))?;
         header.push(byte);
         if header.len() > MAX_HEADER_HEADER_CAPACITY {
             return Err(HttpError::HeaderToBig);
@@ -96,15 +96,15 @@ where
 {
     let mut result = Vec::new();
     loop {
-        result.push(sock.read_u8().await.or(Err(HttpError::LimitedTranciever))?);
+        result.push(sock.read_u8().await.or(Err(HttpError::LineRead))?);
         if result.ends_with(b"\r\n") {
             break;
         } else if result.len() > MAX_LINE_SIZE {
-            return Err(HttpError::LimitedTranciever);
+            return Err(HttpError::LineTooLong);
         }
     }
     result.resize(result.len() - 2, 0);
-    Ok(String::from_utf8(result).or(Err(HttpError::LimitedTranciever))?)
+    Ok(String::from_utf8(result).or(Err(HttpError::LineNotUtf8))?)
 }
 
 const ERROR_400: &str = std::include_str!("error_pages/400.html");
@@ -142,7 +142,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
             Err(_) => {
                 let response = Response::new("1.1", 400, "invalid header", Headers::new());
                 return_error_page(&mut timed_our_stream, response, ERROR_400).await?;
-                return Err(HttpError::HeaderInvalid)
+                return Err(HttpError::HeaderParseError)
             }
         };
         //analyze request
@@ -168,9 +168,9 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
             }
             _other_methods => {
                 let (_rest, url) =
-                    parser::url(request.url.as_str()).or(Err(HttpError::HeaderInvalid))?;
+                    parser::url(request.url.as_str()).or(Err(HttpError::HeaderParseError))?;
                 if url.protocol != "http" {
-                    return Err(HttpError::HeaderInvalid);
+                    return Err(HttpError::UrlProtocolInvalid);
                 }
                 let to_resolve = format!("{}:{}", url.host, url.port);
                 // let mut dst = connection_pool
@@ -208,7 +208,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                 //process response
                 let response_header = read_header(&mut *dst).await?;
                 let (_input, response) =
-                    parser::response(response_header.as_str()).or(Err(HttpError::HeaderInvalid))?;
+                    parser::response(response_header.as_str()).or(Err(HttpError::ResponceHeaderParseError))?;
                 timed_our_stream
                     .write_all(response.to_string().as_bytes())
                     .await
@@ -232,7 +232,7 @@ async fn http_parser(name: String, sock: TcpStream) -> HttpResult<()> {
                 if response.has_body(&request) {
                     //check response format (contet-length or chunked)
                     if let Some(length) = response.headers.content_length() {
-                        limited_transceiver(&mut timed_our_stream, &mut *dst, length).await?;
+                        limited_transceiver(&mut timed_our_stream, &mut *dst, length+2).await?;
                     } else if response.headers.is_chuncked() {
                         chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
                     }

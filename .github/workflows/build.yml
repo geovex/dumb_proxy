@@ -5,13 +5,33 @@ on: [push]
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        toolchain: [stable, beta, nightly]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: Swatinem/rust-cache@v1.3.0
     - uses: actions/checkout@v2
-    - name: Build
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.rustup/toolchains
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+        key: rust-toolchain-${{ matrix.toolchain }}
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.toolchain }}
+    - uses: Swatinem/rust-cache@v1.3.0
+    - name: Build Debug
       run: cargo build --verbose
+    - name: Build Release
+      run: cargo build --verbose --release
     - name: Run tests
       run: cargo test --verbose
+    - name: Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: target-${{ matrix.os }}-${{ matrix.toolchain }}
+        path: target/release/proxy*

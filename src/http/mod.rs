@@ -59,6 +59,7 @@ where
         let (_rest, (length, _ext)) =
             parser::chunk_line(length_str.as_str()).or(Err(HttpError::ChunkTranciever))?;
         if length == 0 {
+            read_line(dst).await?;
             src.write_all(b"0\r\n\r\n")
                 .await
                 .or(Err(HttpError::ChunkTranciever))?;

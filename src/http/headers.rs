@@ -1,5 +1,8 @@
 use std::fmt;
 #[derive(Clone)]
+
+/// Represents all headers in Vec<key, value>
+/// Can have repeated keys
 pub struct Headers {
     headers: Vec<(String, String)>,
 }
@@ -19,6 +22,7 @@ impl Headers {
         result
     }
 
+    /// Combine all header with the same name in one value.
     pub fn combined_value<S: AsRef<str>>(&self, key: S) -> Option<String> {
         let key = key.as_ref().to_string();
         let mut result = String::new();

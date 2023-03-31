@@ -12,12 +12,6 @@ pub struct SockRef<'cp> {
     pool: &'cp ConnectionPool,
 }
 
-impl SockRef<'_> {
-    // pub fn close(&mut self) {
-    //     self.sock.take();
-    // }
-}
-
 impl Drop for SockRef<'_> {
     fn drop(&mut self) {
         if let Some(sock) = self.sock.take() {

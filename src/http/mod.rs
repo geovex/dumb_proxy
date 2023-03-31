@@ -179,7 +179,7 @@ impl Http {
             match request.method.as_str() {
                 "CONNECT" => {
                     request.headers.keep_alive_value();
-                    let mut dst_sock = TcpStream::connect(&request.url)
+                    let dst_sock = TcpStream::connect(&request.url)
                         .await
                         .or(Err(HttpError::TargetUnreachable(request.url.clone())))?;
                     let dst_ip = dst_sock.peer_addr().unwrap();
@@ -189,24 +189,23 @@ impl Http {
                         .await
                         .or(Err(HttpError::Internal))?;
                     logger::log(format!("http.{} CONECT {:?} -> {:?}", name, src_ip, dst_ip));
-                    util::transceiver(&mut timed_our_stream, &mut dst_sock)
+                    let mut dst_timed_out = TimeoutStream::new(dst_sock);
+                    dst_timed_out.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
+                    let mut dst_timed_out = Box::pin(dst_timed_out);
+                    util::transceiver(&mut timed_our_stream, &mut dst_timed_out)
                         .await
                         .or(Err(HttpError::LimitedTranciever))?;
-                    //FIXME handle errors
-                    //FIXME handle keepalive
                     break;
                 }
                 _other_methods => {
+                    // parse request
                     let (_rest, url) =
                         parser::url(request.url.as_str()).or(Err(HttpError::HeaderParseError))?;
                     if url.protocol != "http" {
                         return Err(HttpError::UrlProtocolInvalid);
                     }
+                    // connect to target
                     let to_resolve = format!("{}:{}", url.host, url.port);
-                    // let mut dst = connection_pool
-                    //     .connect_or_reuse(to_resolve)
-                    //     .await
-                    //     .or(Err(HttpError::TargetUnreachable))?;
                     let mut dst = match connection_pool.connect_or_reuse(&to_resolve).await {
                         Ok(sock) => sock,
                         Err(_) => {
@@ -224,7 +223,6 @@ impl Http {
                     //modify request
                     let mut new_request = request.clone();
                     new_request.url = url.path;
-                    //dst.write_all()
                     dst.write_all(new_request.to_string().as_bytes())
                         .await
                         .or(Err(HttpError::Internal))?;

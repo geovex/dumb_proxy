@@ -162,113 +162,110 @@ impl Http {
         //read header
         sock.set_nodelay(true).or(Err(HttpError::Internal))?;
         let mut connection_pool = connection_pool::ConnectionPool::new();
-        let mut timed_our_stream = TimeoutStream::new(sock);
-        timed_our_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
-        let mut timed_our_stream = Box::pin(timed_our_stream);
+        let mut timed_out_stream = TimeoutStream::new(sock);
+        timed_out_stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
+        let mut timed_out_stream = Box::pin(timed_out_stream);
         'main: loop {
-            let header = Self::read_header(&mut timed_our_stream).await?;
+            let header = Self::read_header(&mut timed_out_stream).await?;
             let request = match parser::request(header.as_str()) {
                 Ok((_rest, request)) => request,
                 Err(_) => {
                     let response = Response::new("1.1", 400, "invalid header", Headers::new());
-                    Self::return_error_page(&mut timed_our_stream, response, ERROR_400).await?;
+                    Self::return_error_page(&mut timed_out_stream, response, ERROR_400).await?;
                     return Err(HttpError::HeaderParseError);
                 }
             };
             //analyze request
-            match request.method.as_str() {
-                "CONNECT" => {
-                    request.headers.keep_alive_value();
-                    let dst_sock = TcpStream::connect(&request.url)
-                        .await
-                        .or(Err(HttpError::TargetUnreachable(request.url.clone())))?;
-                    let dst_ip = dst_sock.peer_addr().unwrap();
-                    let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
-                    timed_our_stream
-                        .write_all(reply.as_bytes())
-                        .await
-                        .or(Err(HttpError::Internal))?;
-                    logger::log(format!("http.{} CONECT {:?} -> {:?}", name, src_ip, dst_ip));
-                    let mut dst_timed_out = TimeoutStream::new(dst_sock);
-                    dst_timed_out.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
-                    let mut dst_timed_out = Box::pin(dst_timed_out);
-                    util::transceiver(&mut timed_our_stream, &mut dst_timed_out)
-                        .await
-                        .or(Err(HttpError::LimitedTranciever))?;
-                    break;
+            if request.method == "CONNECT" {
+                request.headers.keep_alive_value();
+                let dst_sock = TcpStream::connect(&request.url)
+                    .await
+                    .or(Err(HttpError::TargetUnreachable(request.url.clone())))?;
+                let dst_ip = dst_sock.peer_addr().unwrap();
+                let reply = format!("HTTP/{} 200 OK\r\n\r\n", request.http_version);
+                timed_out_stream
+                    .write_all(reply.as_bytes())
+                    .await
+                    .or(Err(HttpError::Internal))?;
+                logger::log(format!("http.{} CONECT {:?} -> {:?}", name, src_ip, dst_ip));
+                let mut dst_timed_out = TimeoutStream::new(dst_sock);
+                dst_timed_out.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)));
+                let mut dst_timed_out = Box::pin(dst_timed_out);
+                util::transceiver(&mut timed_out_stream, &mut dst_timed_out)
+                    .await
+                    .or(Err(HttpError::LimitedTranciever))?;
+                break;
+            } else { // other request methods
+                // parse request
+                let (_rest, url) =
+                    parser::url(request.url.as_str()).or(Err(HttpError::HeaderParseError))?;
+                if url.protocol != "http" {
+                    return Err(HttpError::UrlProtocolInvalid);
                 }
-                _other_methods => {
-                    // parse request
-                    let (_rest, url) =
-                        parser::url(request.url.as_str()).or(Err(HttpError::HeaderParseError))?;
-                    if url.protocol != "http" {
-                        return Err(HttpError::UrlProtocolInvalid);
+                // connect to target
+                let to_resolve = format!("{}:{}", url.host, url.port);
+                let mut dst = match connection_pool.connect_or_reuse(&to_resolve).await {
+                    Ok(sock) => sock,
+                    Err(_) => {
+                        let response = Response::new(
+                            request.http_version,
+                            502,
+                            "connection failed",
+                            Headers::new(),
+                        );
+                        Self::return_error_page(&mut timed_out_stream, response, ERROR_502).await?;
+                        return Err(HttpError::TargetUnreachable(to_resolve));
                     }
-                    // connect to target
-                    let to_resolve = format!("{}:{}", url.host, url.port);
-                    let mut dst = match connection_pool.connect_or_reuse(&to_resolve).await {
-                        Ok(sock) => sock,
-                        Err(_) => {
-                            let response = Response::new(
-                                request.http_version,
-                                502,
-                                "connection failed",
-                                Headers::new(),
-                            );
-                            Self::return_error_page(&mut timed_our_stream, response, ERROR_502)
-                                .await?;
-                            return Err(HttpError::TargetUnreachable(to_resolve));
-                        }
-                    };
-                    //modify request
-                    let mut new_request = request.clone();
-                    new_request.url = url.path;
-                    dst.write_all(new_request.to_string().as_bytes())
-                        .await
-                        .or(Err(HttpError::Internal))?;
-                    if request.has_body() {
-                        // check request format (content-length or chunked)
-                        if let Some(length) = request.headers.content_length() {
-                            Self::limited_transceiver(&mut *dst, &mut timed_our_stream, length)
-                                .await?;
-                        } else if request.headers.is_chuncked() {
-                            Self::chunked_transceiver(&mut *dst, &mut timed_our_stream).await?;
-                        }
+                };
+                //modify request
+                let mut new_request = request.clone();
+                new_request.url = url.path;
+                dst.write_all(new_request.to_string().as_bytes())
+                    .await
+                    .or(Err(HttpError::Internal))?;
+                if request.has_body() {
+                    // check request format (content-length or chunked)
+                    if let Some(length) = request.headers.content_length() {
+                        Self::limited_transceiver(&mut *dst, &mut timed_out_stream, length).await?;
+                    } else if request.headers.is_chuncked() {
+                        Self::chunked_transceiver(&mut *dst, &mut timed_out_stream).await?;
                     }
-                    //process response
-                    let response_header = Self::read_header(&mut *dst).await?;
-                    let (_input, response) = parser::response(response_header.as_str())
-                        .or(Err(HttpError::ResponceHeaderParseError))?;
-                    timed_our_stream
-                        .write_all(response.to_string().as_bytes())
-                        .await
-                        .or(Err(HttpError::Internal))?;
-                    //update timeout values
-                    if let Some(timeout) = response.headers.keep_alive_value() {
-                        timed_our_stream.as_mut().set_read_timeout_pinned(Some(
-                            Duration::from_secs(timeout.timeout + TIMEOUT_TOLERANCE_SECS),
-                        ))
-                    } else {
-                        timed_our_stream.as_mut().set_read_timeout_pinned(Some(
-                            Duration::from_secs(DEFAULT_TIMEOUT_SECS),
-                        ))
+                }
+                //process response
+                let response_header = Self::read_header(&mut *dst).await?;
+                let (_input, response) = parser::response(response_header.as_str())
+                    .or(Err(HttpError::ResponceHeaderParseError))?;
+                timed_out_stream
+                    .write_all(response.to_string().as_bytes())
+                    .await
+                    .or(Err(HttpError::Internal))?;
+                //update timeout values
+                if let Some(timeout) = response.headers.keep_alive_value() {
+                    timed_out_stream
+                        .as_mut()
+                        .set_read_timeout_pinned(Some(Duration::from_secs(
+                            timeout.timeout + TIMEOUT_TOLERANCE_SECS,
+                        )))
+                } else {
+                    timed_out_stream
+                        .as_mut()
+                        .set_read_timeout_pinned(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+                }
+                logger::log(format!(
+                    "http.{} {} {:?} -> {:?} {}",
+                    name, request.method, src_ip, request.url, response.status
+                ));
+                if response.has_body(&request) {
+                    //check response format (contet-length or chunked)
+                    if let Some(length) = response.headers.content_length() {
+                        Self::limited_transceiver(&mut timed_out_stream, &mut *dst, length + 2)
+                            .await?;
+                    } else if response.headers.is_chuncked() {
+                        Self::chunked_transceiver(&mut timed_out_stream, &mut *dst).await?;
                     }
-                    logger::log(format!(
-                        "http.{} {} {:?} -> {:?} {}",
-                        name, request.method, src_ip, request.url, response.status
-                    ));
-                    if response.has_body(&request) {
-                        //check response format (contet-length or chunked)
-                        if let Some(length) = response.headers.content_length() {
-                            Self::limited_transceiver(&mut timed_our_stream, &mut *dst, length + 2)
-                                .await?;
-                        } else if response.headers.is_chuncked() {
-                            Self::chunked_transceiver(&mut timed_our_stream, &mut *dst).await?;
-                        }
-                    }
-                    if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
-                        break 'main;
-                    }
+                }
+                if !(request.headers.is_keep_alive() && response.headers.is_keep_alive()) {
+                    break 'main;
                 }
             }
         }

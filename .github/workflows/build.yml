@@ -12,17 +12,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.rustup/toolchains
-          ~/.rustup/update-hashes
-          ~/.rustup/settings.toml
-        key: rust-toolchain-${{ matrix.toolchain }}
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.toolchain }}
-    - uses: Swatinem/rust-cache@v1.3.0
     - name: Build Debug
       run: cargo build --verbose
     - name: Build Release

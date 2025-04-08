@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4"
-tokio = {version = "1.35", features = ["full"] }
+tokio = {version = "1.38", features = ["full"] }
 tokio-io-timeout = "1.2"
 futures = "0.3"
 toml = "0.8.8"

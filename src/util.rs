@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 
-use socket2::{Socket, Domain, Type, Protocol};
-use tokio;
+use socket2::{Domain, Protocol, Socket, Type};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Result};
 use tokio::net::TcpListener;
 
@@ -33,7 +32,7 @@ pub async fn bind_listener(port: u16) -> TcpListener {
     let addr: SocketAddr = format!("[::]:{}", port).parse().unwrap();
     let std_listener = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP)).unwrap();
     std_listener.set_only_v6(false).unwrap();
-    std_listener.set_nodelay(true).unwrap();
+    std_listener.set_tcp_nodelay(true).unwrap();
     std_listener.set_reuse_address(true).unwrap();
     std_listener.set_nonblocking(true).unwrap();
     std_listener.bind(&addr.into()).unwrap();
